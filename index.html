@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M&ndash;N Interaction Capacity Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F6F4EE;
+    --paper-raised: #FCFBF8;
+    --ink: #1C1C1A;
+    --ink-soft: #55534C;
+    --line: #DAD5C6;
+    --line-strong: #B8B2A0;
+    --blueprint: #1F4E79;
+    --blueprint-soft: #4A7BA6;
+    --safe-fill: rgba(31, 78, 121, 0.07);
+    --red: #A8331F;
+    --red-fill: rgba(168, 51, 31, 0.08);
+    --green: #386641;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --display: 'Space Grotesk', 'Arial Narrow', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--mono);
+  }
+
+  body {
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+
+  header {
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 18px;
+    margin-bottom: 24px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--blueprint);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(24px, 3.4vw, 36px);
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+
+  header p {
+    margin: 0;
+    max-width: 640px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+  }
+
+  .plot-panel { padding: 16px 16px 8px; }
+
+  .plot-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+
+  .plot-toolbar .hint { letter-spacing: 0.02em; }
+
+  svg#plot { width: 100%; height: auto; display: block; touch-action: none; }
+
+  .pt-label {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .axis-label {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 15px;
+    fill: var(--ink);
+  }
+
+  .tick-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--ink-soft);
+  }
+
+  .side { display: flex; flex-direction: column; gap: 16px; }
+
+  .card { padding: 16px 18px; }
+
+  .card h2 {
+    font-family: var(--display);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 12px;
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .segmented button {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 9px 6px;
+    border: none;
+    background: var(--paper);
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background .12s ease, color .12s ease;
+    border-left: 1px solid var(--line-strong);
+  }
+  .segmented button:first-child { border-left: none; }
+
+  .segmented button.active {
+    background: var(--blueprint);
+    color: #fff;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+
+  .field label {
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    letter-spacing: 0.03em;
+  }
+
+  .field input[type=number] {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 7px 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 2px;
+    background: var(--paper);
+    color: var(--ink);
+    width: 100%;
+  }
+  .field input[type=number]:focus {
+    outline: 2px solid var(--blueprint-soft);
+    outline-offset: 0;
+  }
+
+  .coord-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    margin-top: 4px;
+  }
+  .coord-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-size: 10.5px;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .coord-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .coord-table tr:last-child td { border-bottom: none; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+
+  .lf-readout {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .lf-value {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1;
+  }
+
+  .lf-status {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    font-weight: 600;
+  }
+  .status-pass { background: rgba(56,102,65,0.12); color: var(--green); }
+  .status-fail { background: rgba(168,51,31,0.12); color: var(--red); }
+
+  .lf-note {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+
+  .error-box {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--red);
+    background: var(--red-fill);
+    border: 1px solid rgba(168,51,31,0.25);
+    border-radius: 2px;
+    padding: 8px 10px;
+    line-height: 1.5;
+  }
+
+  .reset-btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--line-strong);
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 2px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 12px;
+  }
+  .reset-btn:hover { background: var(--line); }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+
+  footer {
+    margin-top: 30px;
+    font-size: 11px;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    line-height: 1.6;
+  }
+  footer a { color: var(--blueprint); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+	<h1>M&ndash;N Interaction Diagram</h1>
+    <p>Drag p1 (permanent load) and p2 (permanent + live load) on the plot. The load path is extended to p3, where it crosses the failure envelope, and the load factor LF = (n3&minus;n1)/(n2&minus;n1) is reported live.</p>
+  </header>
+
+  <div class="layout">
+    <div class="panel plot-panel">
+      <div class="plot-toolbar">
+        <span>n = N / (b&middot;h&middot;f<tspan>c</tspan>) &nbsp;&nbsp; m = M / (b&middot;h&sup2;&middot;f<tspan>c</tspan>)</span>
+        <span class="hint">drag p1 / p2</span>
+      </div>
+      <svg id="plot" viewBox="0 0 720 470" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <div class="side">
+      <div class="panel card">
+        <h2>Envelope stage</h2>
+        <div class="segmented" id="stageToggle">
+          <button data-lim="e" class="active">Elastic &middot; Stage II</button>
+          <button data-lim="c">Concrete &middot; Stage III</button>
+        </div>
+        <div class="field-row" id="alphaBetaRow" style="display:none;">
+          <div class="field">
+            <label for="alphaIn">&alpha; (compressive strength factor)</label>
+            <input type="number" id="alphaIn" value="0.8" step="0.01" min="0.01" max="1">
+          </div>
+          <div class="field">
+            <label for="betaIn">&beta; (compression zone c.g.)</label>
+            <input type="number" id="betaIn" value="0.4" step="0.01" min="0.01" max="1">
+          </div>
+        </div>
+      </div>
+
+      <div class="panel card">
+        <h2>Load points</h2>
+        <div class="field-row">
+          <div class="field"><label for="n1In">n1</label><input type="number" id="n1In" step="0.01"></div>
+          <div class="field"><label for="m1In">m1</label><input type="number" id="m1In" step="0.01"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="n2In">n2</label><input type="number" id="n2In" step="0.01"></div>
+          <div class="field"><label for="m2In">m2</label><input type="number" id="m2In" step="0.01"></div>
+        </div>
+        <table class="coord-table">
+          <thead><tr><th>point</th><th>n</th><th>m</th></tr></thead>
+          <tbody>
+            <tr><td><span class="dot" style="background:var(--blueprint)"></span>p1</td><td id="p1n">&mdash;</td><td id="p1m">&mdash;</td></tr>
+            <tr><td><span class="dot" style="background:var(--blueprint-soft)"></span>p2</td><td id="p2n">&mdash;</td><td id="p2m">&mdash;</td></tr>
+            <tr><td><span class="dot" style="background:var(--red)"></span>p3</td><td id="p3n">&mdash;</td><td id="p3m">&mdash;</td></tr>
+          </tbody>
+        </table>
+        <button class="reset-btn" id="resetBtn">Reset to default points</button>
+      </div>
+
+      <div class="panel card">
+        <h2>Load factor</h2>
+        <div class="lf-readout">
+          <div class="lf-value" id="lfValue">&mdash;</div>
+          <div class="lf-status" id="lfStatus"></div>
+        </div>
+        <div class="lf-note">LF &ge; 1.0 means the section reaches p2 without exceeding the failure envelope. LF &lt; 1.0 means failure occurs before p2 is reached.</div>
+        <div class="error-box" id="errorBox" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  const state = {
+    lim: 'e',
+    alpha: 0.8,
+    beta: 0.4,
+    n1: 0.1, m1: 0.01,
+    n2: 0.2, m2: 0.03
+  };
+
+  const DEFAULTS = { n1: 0.1, m1: 0.01, n2: 0.2, m2: 0.03 };
+
+  // ---------- plot geometry ----------
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById('plot');
+  const M = { left: 56, right: 690, top: 26, bottom: 400 };
+  const DOMAIN = { nMin: 0, nMax: 1.0, mMin: -0.2, mMax: 0.2 };
+
+  function sx(n){ return M.left + (n - DOMAIN.nMin) / (DOMAIN.nMax - DOMAIN.nMin) * (M.right - M.left); }
+  function sy(m){ return M.bottom - (m - DOMAIN.mMin) / (DOMAIN.mMax - DOMAIN.mMin) * (M.bottom - M.top); }
+  function invx(x){ return DOMAIN.nMin + (x - M.left) / (M.right - M.left) * (DOMAIN.nMax - DOMAIN.nMin); }
+  function invy(y){ return DOMAIN.mMin + (M.bottom - y) / (M.bottom - M.top) * (DOMAIN.mMax - DOMAIN.mMin); }
+
+  function el(tag, attrs){
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  // ---------- math: mirrors MN_cap.m ----------
+  function envelopeFn(lim, alpha, beta){
+    if (lim === 'e') {
+      return { m: n => 0.5*n - n*n*(2/3), nMax: 0.75 };
+    } else {
+      return { m: n => 0.5*n - n*n*(beta/alpha), nMax: 2*beta/alpha };
+    }
+  }
+
+  function mnCap(n1, m1, n2in, m2, lim, alpha, beta){
+    let n2 = n2in;
+    if (n2 === n1) n2 = n1 + 1e-6;
+    const k = (m2 - m1) / (n2 - n1);
+    const { m: mFunc, nMax } = envelopeFn(lim, alpha, beta);
+
+    let np;
+    if (lim === 'e') {
+      const disc1 = Math.pow(k-0.5,2) - (m1 - n1*k) * 8/3;
+      const disc2 = Math.pow(k+0.5,2) + (m1 - n1*k) * 8/3;
+      np = [
+        0.75*((0.5-k) + Math.sqrt(disc1)),
+        0.75*((0.5-k) - Math.sqrt(disc1)),
+        0.75*((0.5+k) + Math.sqrt(disc2)),
+        0.75*((0.5+k) - Math.sqrt(disc2))
+      ];
+    } else {
+      const c = 0.5*alpha/beta;
+      const disc1 = Math.pow(k-0.5,2) - 4*(beta/alpha)*(m1 - n1*k);
+      const disc2 = Math.pow(k+0.5,2) + 4*(beta/alpha)*(m1 - n1*k);
+      np = [
+        c*((0.5-k) + Math.sqrt(disc1)),
+        c*((0.5-k) - Math.sqrt(disc1)),
+        c*((0.5+k) + Math.sqrt(disc2)),
+        c*((0.5+k) - Math.sqrt(disc2))
+      ];
+    }
+
+    if (n1 < 0) return { error: 'n1 must be positive.', nMax, mFunc };
+    if (n1 > nMax) return { error: `n1 must be less than n_max (${nMax.toFixed(3)}).`, nMax, mFunc };
+    if (Math.abs(m1) > Math.abs(mFunc(n1)) + 1e-9) return { error: 'p1 exceeds the failure envelope.', nMax, mFunc };
+
+    const mL = n => m1 + (n - n1) * (m2 - m1) / (n2 - n1);
+    const eps = 1e-9;
+    let candidates;
+    if (n2 >= n1) {
+      candidates = np.filter(v => !isNaN(v) && v >= n1 - eps && v <= nMax + eps);
+    } else {
+      candidates = np.filter(v => !isNaN(v) && v >= 0 - eps && v < n1);
+    }
+    if (candidates.length === 0) return { error: 'No intersection with the envelope found for this load path.', nMax, mFunc };
+
+    const n3 = Math.max(...candidates);
+    const m3 = mL(n3);
+    const LF = (n3 - n1) / (n2 - n1);
+    return { LF, n3, m3, nMax, mFunc, error: null };
+  }
+
+  // ---------- static grid (drawn once per stage change) ----------
+  let gEnvelope, gGrid, gDynamic;
+
+  function buildStaticLayers(){
+    svg.innerHTML = '';
+    gGrid = el('g', {});
+    gEnvelope = el('g', {});
+    gDynamic = el('g', {});
+    svg.appendChild(gGrid);
+    svg.appendChild(gEnvelope);
+    svg.appendChild(gDynamic);
+    drawGrid();
+  }
+
+  function drawGrid(){
+    gGrid.innerHTML = '';
+    // background
+    gGrid.appendChild(el('rect', { x: M.left, y: M.top, width: M.right-M.left, height: M.bottom-M.top, fill: 'var(--paper)', stroke: 'none' }));
+
+    // vertical gridlines every 0.1 in n
+    for (let n = 0; n <= 1.0001; n += 0.1) {
+      const x = sx(n);
+      gGrid.appendChild(el('line', { x1:x, y1:M.top, x2:x, y2:M.bottom, stroke: 'var(--line)', 'stroke-width': 1 }));
+      const t = el('text', { x: x, y: M.bottom + 16, class: 'tick-label', 'text-anchor': 'middle' });
+      t.textContent = n.toFixed(1);
+      gGrid.appendChild(t);
+    }
+    // horizontal gridlines every 0.05 in m
+    for (let m = -0.2; m <= 0.2001; m += 0.05) {
+      const y = sy(m);
+      gGrid.appendChild(el('line', { x1:M.left, y1:y, x2:M.right, y2:y, stroke: 'var(--line)', 'stroke-width': 1 }));
+      const t = el('text', { x: M.left - 10, y: y+3, class: 'tick-label', 'text-anchor': 'end' });
+      t.textContent = m.toFixed(2);
+      gGrid.appendChild(t);
+    }
+    // axes (n-axis at m=0, m-axis at n=0)
+    gGrid.appendChild(el('line', { x1:M.left, y1:sy(0), x2:M.right, y2:sy(0), stroke: 'var(--line-strong)', 'stroke-width': 1.4 }));
+    gGrid.appendChild(el('line', { x1:sx(0), y1:M.top, x2:sx(0), y2:M.bottom, stroke: 'var(--line-strong)', 'stroke-width': 1.4 }));
+
+    // axis labels
+    const xl = el('text', { x: (M.left+M.right)/2, y: M.bottom + 34, class: 'axis-label', 'text-anchor':'middle' });
+    xl.textContent = 'n';
+    gGrid.appendChild(xl);
+    const yl = el('text', { x: 18, y: (M.top+M.bottom)/2, class: 'axis-label', 'text-anchor':'middle' });
+    yl.textContent = 'm';
+    gGrid.appendChild(yl);
+
+    // border
+    gGrid.appendChild(el('rect', { x: M.left, y: M.top, width: M.right-M.left, height: M.bottom-M.top, fill: 'none', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
+  }
+
+  function drawEnvelope(nMax, mFunc){
+    gEnvelope.innerHTML = '';
+    const N = 60;
+    const top = [], bot = [];
+    for (let i = 0; i <= N; i++) {
+      const n = nMax * i / N;
+      top.push([n, mFunc(n)]);
+      bot.push([n, -mFunc(n)]);
+    }
+    const poly = top.concat(bot.slice().reverse());
+    const d = poly.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ') + ' Z';
+    gEnvelope.appendChild(el('path', { d, fill: 'var(--safe-fill)', stroke: 'none' }));
+
+    const dTop = top.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ');
+    const dBot = bot.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ');
+    gEnvelope.appendChild(el('path', { d: dTop, fill: 'none', stroke: 'var(--blueprint)', 'stroke-width': 2 }));
+    gEnvelope.appendChild(el('path', { d: dBot, fill: 'none', stroke: 'var(--blueprint)', 'stroke-width': 2 }));
+  }
+
+  // ---------- dynamic layer: load line + points ----------
+  let dragTarget = null;
+
+  function pointerToDomain(evt){
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX; pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM().inverse();
+    const loc = pt.matrixTransform(ctm);
+    return { n: invx(loc.x), m: invy(loc.y) };
+  }
+
+  function makeDraggable(circleEl, key){
+    circleEl.addEventListener('pointerdown', (e) => {
+      dragTarget = key;
+      circleEl.setPointerCapture(e.pointerId);
+    });
+  }
+
+  svg.addEventListener('pointermove', (e) => {
+    if (!dragTarget) return;
+    const { n, m } = pointerToDomain(e);
+    const nc = Math.min(Math.max(n, DOMAIN.nMin), DOMAIN.nMax);
+    const mc = Math.min(Math.max(m, DOMAIN.mMin), DOMAIN.mMax);
+    if (dragTarget === 'p1') { state.n1 = round3(nc); state.m1 = round3(mc); }
+    else { state.n2 = round3(nc); state.m2 = round3(mc); }
+    syncInputs();
+    render();
+  });
+  svg.addEventListener('pointerup', () => { dragTarget = null; });
+  svg.addEventListener('pointercancel', () => { dragTarget = null; });
+
+  function round3(v){ return Math.round(v*1000)/1000; }
+
+  function render(){
+    const result = mnCap(state.n1, state.m1, state.n2, state.m2, state.lim, state.alpha, state.beta);
+
+    gDynamic.innerHTML = '';
+
+    // load line p1 -> p2 (solid)
+    gDynamic.appendChild(el('line', {
+      x1: sx(state.n1), y1: sy(state.m1), x2: sx(state.n2), y2: sy(state.m2),
+      stroke: 'var(--ink-soft)', 'stroke-width': 1.6
+    }));
+
+    if (!result.error) {
+      // extension p2 -> p3 (dashed)
+      gDynamic.appendChild(el('line', {
+        x1: sx(state.n2), y1: sy(state.m2), x2: sx(result.n3), y2: sy(result.m3),
+        stroke: 'var(--ink-soft)', 'stroke-width': 1.4, 'stroke-dasharray': '5 4'
+      }));
+      // p3 point
+      gDynamic.appendChild(el('circle', { cx: sx(result.n3), cy: sy(result.m3), r: 6, fill: 'var(--red)', stroke: '#fff', 'stroke-width': 1.5 }));
+      const lbl3 = el('text', { x: sx(result.n3)+9, y: sy(result.m3)-8, class: 'pt-label', fill: 'var(--red)' });
+      lbl3.textContent = 'p3';
+      gDynamic.appendChild(lbl3);
+    }
+
+    // p1
+    const c1 = el('circle', { cx: sx(state.n1), cy: sy(state.m1), r: 7, fill: 'var(--blueprint)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
+    gDynamic.appendChild(c1);
+    const lbl1 = el('text', { x: sx(state.n1)+10, y: sy(state.m1)-9, class: 'pt-label', fill: 'var(--blueprint)' });
+    lbl1.textContent = 'p1';
+    gDynamic.appendChild(lbl1);
+    makeDraggable(c1, 'p1');
+
+    // p2
+    const c2 = el('circle', { cx: sx(state.n2), cy: sy(state.m2), r: 7, fill: 'var(--blueprint-soft)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
+    gDynamic.appendChild(c2);
+    const lbl2 = el('text', { x: sx(state.n2)+10, y: sy(state.m2)-9, class: 'pt-label', fill: 'var(--blueprint-soft)' });
+    lbl2.textContent = 'p2';
+    gDynamic.appendChild(lbl2);
+    makeDraggable(c2, 'p2');
+
+    // side panel updates
+    document.getElementById('p1n').textContent = state.n1.toFixed(3);
+    document.getElementById('p1m').textContent = state.m1.toFixed(3);
+    document.getElementById('p2n').textContent = state.n2.toFixed(3);
+    document.getElementById('p2m').textContent = state.m2.toFixed(3);
+
+    const errorBox = document.getElementById('errorBox');
+    const lfValue = document.getElementById('lfValue');
+    const lfStatus = document.getElementById('lfStatus');
+
+    if (result.error) {
+      errorBox.style.display = 'block';
+      errorBox.textContent = result.error;
+      lfValue.textContent = '\u2014';
+      lfStatus.textContent = '';
+      lfStatus.className = 'lf-status';
+      document.getElementById('p3n').textContent = '\u2014';
+      document.getElementById('p3m').textContent = '\u2014';
+    } else {
+      errorBox.style.display = 'none';
+      lfValue.textContent = result.LF.toFixed(2);
+      document.getElementById('p3n').textContent = result.n3.toFixed(3);
+      document.getElementById('p3m').textContent = result.m3.toFixed(3);
+      if (result.LF >= 1) {
+        lfStatus.textContent = 'Pass';
+        lfStatus.className = 'lf-status status-pass';
+      } else {
+        lfStatus.textContent = 'Fail';
+        lfStatus.className = 'lf-status status-fail';
+      }
+    }
+  }
+
+  function syncInputs(){
+    document.getElementById('n1In').value = state.n1;
+    document.getElementById('m1In').value = state.m1;
+    document.getElementById('n2In').value = state.n2;
+    document.getElementById('m2In').value = state.m2;
+  }
+
+  // ---------- UI wiring ----------
+  document.getElementById('stageToggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    document.querySelectorAll('#stageToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.lim = btn.dataset.lim;
+    document.getElementById('alphaBetaRow').style.display = (state.lim === 'c') ? 'grid' : 'none';
+    const { nMax, m: mFunc } = envelopeFn(state.lim, state.alpha, state.beta);
+    drawEnvelope(nMax, mFunc);
+    render();
+  });
+
+  document.getElementById('alphaIn').addEventListener('input', (e) => {
+    state.alpha = parseFloat(e.target.value) || 0.8;
+    updateConcreteEnvelope();
+  });
+  document.getElementById('betaIn').addEventListener('input', (e) => {
+    state.beta = parseFloat(e.target.value) || 0.4;
+    updateConcreteEnvelope();
+  });
+  function updateConcreteEnvelope(){
+    if (state.lim !== 'c') return;
+    const { nMax, m: mFunc } = envelopeFn(state.lim, state.alpha, state.beta);
+    drawEnvelope(nMax, mFunc);
+    render();
+  }
+
+  ['n1In','m1In','n2In','m2In'].forEach(id => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      const key = id.slice(0,2);
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val)) { state[key] = val; render(); }
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.assign(state, DEFAULTS);
+    syncInputs();
+    render();
+  });
+
+  // ---------- init ----------
+  buildStaticLayers();
+  const initEnv = envelopeFn(state.lim, state.alpha, state.beta);
+  drawEnvelope(initEnv.nMax, initEnv.m);
+  syncInputs();
+  render();
+})();
+</script>
+</body>
+</html>
