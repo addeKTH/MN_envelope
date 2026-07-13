@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>M&ndash;N Interaction Capacity Check</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper: #F6F4EE;
@@ -14,14 +15,17 @@
     --ink-soft: #55534C;
     --line: #DAD5C6;
     --line-strong: #B8B2A0;
-    --blueprint: #1F4E79;
-    --blueprint-soft: #4A7BA6;
-    --safe-fill: rgba(31, 78, 121, 0.07);
+    --blueprint: #004791;
+    --blueprint-soft: #4d7fb8;
+    --safe-fill: rgba(0, 71, 145, 0.07);
     --red: #A8331F;
     --red-fill: rgba(168, 51, 31, 0.08);
     --green: #386641;
-    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    --display: 'Space Grotesk', 'Arial Narrow', sans-serif;
+    --p1: #221dd9;
+    --p2: #366f43;
+    --p3: #bf2c17;
+    --mono: 'Figtree', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --display: 'Figtree', 'Arial', sans-serif;
   }
 
   * { box-sizing: border-box; }
@@ -183,6 +187,7 @@
 
   .field input[type=number] {
     font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
     font-size: 13px;
     padding: 7px 8px;
     border: 1px solid var(--line-strong);
@@ -201,7 +206,14 @@
     border-collapse: collapse;
     font-size: 12.5px;
     margin-top: 4px;
+    font-variant-numeric: tabular-nums;
   }
+
+  .plot-toolbar math {
+    font-size: 16px;
+    color: var(--ink);
+  }
+  .plot-toolbar .eq-sep { display: inline-block; width: 22px; }
   .coord-table th {
     text-align: left;
     font-weight: 500;
@@ -261,17 +273,18 @@
 
   .reset-btn {
     font-family: var(--mono);
+    font-weight: 600;
     font-size: 12px;
-    padding: 8px 12px;
-    border: 1px solid var(--line-strong);
-    background: var(--paper);
-    color: var(--ink);
+    padding: 9px 12px;
+    border: 1px solid var(--blueprint);
+    background: var(--blueprint);
+    color: #fff;
     border-radius: 2px;
     cursor: pointer;
     width: 100%;
     margin-top: 12px;
   }
-  .reset-btn:hover { background: var(--line); }
+  .reset-btn:hover { background: #003a75; border-color: #003a75; }
 
   .legend {
     display: flex;
@@ -302,7 +315,23 @@
   <div class="layout">
     <div class="panel plot-panel">
       <div class="plot-toolbar">
-        <span>n = N / (b&middot;h&middot;f<tspan>c</tspan>) &nbsp;&nbsp; m = M / (b&middot;h&sup2;&middot;f<tspan>c</tspan>)</span>
+        <span>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <mi>n</mi><mo>=</mo>
+            <mfrac>
+              <mi>N</mi>
+              <mrow><mi>b</mi><mi>h</mi><msub><mi>f</mi><mi>c</mi></msub></mrow>
+            </mfrac>
+          </math>
+          <span class="eq-sep"></span>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <mi>m</mi><mo>=</mo>
+            <mfrac>
+              <mi>M</mi>
+              <mrow><mi>b</mi><msup><mi>h</mi><mn>2</mn></msup><msub><mi>f</mi><mi>c</mi></msub></mrow>
+            </mfrac>
+          </math>
+        </span>
         <span class="hint">drag p1 / p2</span>
       </div>
       <svg id="plot" viewBox="0 0 720 470" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -340,9 +369,9 @@
         <table class="coord-table">
           <thead><tr><th>point</th><th>n</th><th>m</th></tr></thead>
           <tbody>
-            <tr><td><span class="dot" style="background:var(--blueprint)"></span>p1</td><td id="p1n">&mdash;</td><td id="p1m">&mdash;</td></tr>
-            <tr><td><span class="dot" style="background:var(--blueprint-soft)"></span>p2</td><td id="p2n">&mdash;</td><td id="p2m">&mdash;</td></tr>
-            <tr><td><span class="dot" style="background:var(--red)"></span>p3</td><td id="p3n">&mdash;</td><td id="p3m">&mdash;</td></tr>
+            <tr><td><span class="dot" style="background:var(--p1)"></span>p1</td><td id="p1n">&mdash;</td><td id="p1m">&mdash;</td></tr>
+            <tr><td><span class="dot" style="background:var(--p2)"></span>p2</td><td id="p2n">&mdash;</td><td id="p2m">&mdash;</td></tr>
+            <tr><td><span class="dot" style="background:var(--p3)"></span>p3</td><td id="p3n">&mdash;</td><td id="p3m">&mdash;</td></tr>
           </tbody>
         </table>
         <button class="reset-btn" id="resetBtn">Reset to default points</button>
@@ -571,24 +600,24 @@
         stroke: 'var(--ink-soft)', 'stroke-width': 1.4, 'stroke-dasharray': '5 4'
       }));
       // p3 point
-      gDynamic.appendChild(el('circle', { cx: sx(result.n3), cy: sy(result.m3), r: 6, fill: 'var(--red)', stroke: '#fff', 'stroke-width': 1.5 }));
-      const lbl3 = el('text', { x: sx(result.n3)+9, y: sy(result.m3)-8, class: 'pt-label', fill: 'var(--red)' });
+      gDynamic.appendChild(el('circle', { cx: sx(result.n3), cy: sy(result.m3), r: 6, fill: 'var(--p3)', stroke: '#fff', 'stroke-width': 1.5 }));
+      const lbl3 = el('text', { x: sx(result.n3)+9, y: sy(result.m3)-8, class: 'pt-label', fill: 'var(--p3)' });
       lbl3.textContent = 'p3';
       gDynamic.appendChild(lbl3);
     }
 
     // p1
-    const c1 = el('circle', { cx: sx(state.n1), cy: sy(state.m1), r: 7, fill: 'var(--blueprint)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
+    const c1 = el('circle', { cx: sx(state.n1), cy: sy(state.m1), r: 7, fill: 'var(--p1)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
     gDynamic.appendChild(c1);
-    const lbl1 = el('text', { x: sx(state.n1)+10, y: sy(state.m1)-9, class: 'pt-label', fill: 'var(--blueprint)' });
+    const lbl1 = el('text', { x: sx(state.n1)+10, y: sy(state.m1)-9, class: 'pt-label', fill: 'var(--p1)' });
     lbl1.textContent = 'p1';
     gDynamic.appendChild(lbl1);
     makeDraggable(c1, 'p1');
 
     // p2
-    const c2 = el('circle', { cx: sx(state.n2), cy: sy(state.m2), r: 7, fill: 'var(--blueprint-soft)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
+    const c2 = el('circle', { cx: sx(state.n2), cy: sy(state.m2), r: 7, fill: 'var(--p2)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
     gDynamic.appendChild(c2);
-    const lbl2 = el('text', { x: sx(state.n2)+10, y: sy(state.m2)-9, class: 'pt-label', fill: 'var(--blueprint-soft)' });
+    const lbl2 = el('text', { x: sx(state.n2)+10, y: sy(state.m2)-9, class: 'pt-label', fill: 'var(--p2)' });
     lbl2.textContent = 'p2';
     gDynamic.appendChild(lbl2);
     makeDraggable(c2, 'p2');
@@ -683,5 +712,9 @@
   render();
 })();
 </script>
+
+<div data-role=footer>
+<p> <em> Last updated 2026-07-13</em> </p>
+
 </body>
 </html>
