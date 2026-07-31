@@ -1,388 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>M&ndash;N Interaction Capacity Check</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M-N interaction capacity</title>
 <style>
-  :root{
-    --paper: #F6F4EE;
-    --paper-raised: #FCFBF8;
-    --ink: #1C1C1A;
-    --ink-soft: #55534C;
-    --line: #DAD5C6;
-    --line-strong: #B8B2A0;
-    --blueprint: #004791;
-    --blueprint-soft: #4d7fb8;
-    --safe-fill: rgba(0, 71, 145, 0.07);
-    --red: #A8331F;
-    --red-fill: rgba(168, 51, 31, 0.08);
-    --green: #386641;
-    --p1: #221dd9;
-    --p2: #366f43;
-    --p3: #bf2c17;
-    --mono: 'Figtree', ui-monospace, 'SFMono-Regular', Menlo, monospace;
-    --display: 'Figtree', 'Arial', sans-serif;
+  /* Same visual language as the railway bridge static analysis page: grey
+     ground, near-white panels, one compact control panel on top and the
+     figure below, small system type throughout.  The variable names are the
+     ones the script already uses to colour the SVG, so only their values
+     change here. */
+  :root {
+    --bg:    #f0f0f0;          /* page */
+    --pan:   #fafafa;          /* panel */
+    --brd:   #d5d5d5;          /* panel border */
+    --ink:   #222;
+    --paper: #ffffff;          /* plot area and input background */
+    --line:  #e6e6e6;          /* grid lines */
+    --line-strong: #333333;    /* axes and plot frame */
+    --ink-soft: #555555;       /* load path, tick labels */
+    --blueprint: #0059b3;      /* the capacity envelope, as the influence
+                                  line blue of the bridge page */
+    --safe-fill: rgba(0,89,179,0.10);
+    --p1: #404040;             /* permanent load */
+    --p2: #1a6b3c;             /* permanent + live */
+    --p3: #bf1a1a;             /* on the envelope, the load red of the
+                                  bridge page */
+    --green: #077033;
+    --red:   #a00000;
   }
-
   * { box-sizing: border-box; }
+  body { margin:0; padding:12px; background:var(--bg); color:var(--ink);
+         font:13px/1.4 system-ui,"Segoe UI",Helvetica,Arial,sans-serif; }
+  h1 { font-size:15px; font-weight:600; margin:0 0 10px; }
+  h1 span { font-weight:400; color:#666; }
+  .wrap { max-width:900px; margin:0 auto; }
 
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--mono);
-  }
+  .panel { background:var(--pan); border:1px solid var(--brd); border-radius:4px;
+           padding:10px 12px; margin-bottom:10px;
+           display:grid; grid-template-columns:repeat(4,1fr); gap:4px 18px; }
+  .grp { display:flex; flex-direction:column; gap:4px; }
+  .grp > b { font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+             color:#555; margin-bottom:2px; }
+  .fld { display:grid; grid-template-columns:62px 1fr; align-items:center; gap:6px; }
+  .fld label { font-size:11px; color:#444; }
+  input, select { font:12px inherit; font-family:inherit; padding:2px 4px;
+           border:1px solid #bbb; border-radius:3px; background:var(--paper); width:100%; }
+  input:disabled, select:disabled { background:#eee; color:#999; }
+  #alphaBetaRow { display:none; gap:4px; }
 
-  body {
-    min-height: 100vh;
-    padding: 28px 20px 60px;
-  }
+  .lf { display:flex; align-items:baseline; gap:8px; margin-top:2px; }
+  .lf b { font-size:26px; font-weight:600; line-height:1;
+          font-variant-numeric:tabular-nums; }
+  .lf-status { font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+          padding:2px 6px; border-radius:3px; font-weight:600; }
+  .status-pass { background:rgba(7,112,51,.12); color:var(--green); }
+  .status-fail { background:rgba(170,0,0,.12);  color:var(--red); }
+  .note { font-size:11px; color:#777; }
 
-  .wrap {
-    max-width: 1180px;
-    margin: 0 auto;
-  }
+  .bar { display:flex; align-items:center; gap:8px; grid-column:1/-1;
+         border-top:1px solid var(--brd); padding-top:8px; margin-top:2px; }
+  button { font:12px inherit; padding:3px 10px; border:1px solid #bbb; border-radius:3px;
+           background:#fff; cursor:pointer; }
+  button:hover { background:#eee; }
+  #errorBox { font-size:11px; color:var(--red); }
 
-  header {
-    border-bottom: 1px solid var(--line-strong);
-    padding-bottom: 18px;
-    margin-bottom: 24px;
-  }
+  .figs { background:var(--pan); border:1px solid var(--brd); border-radius:4px;
+          padding:6px 10px 10px; }
+  /* the drawing has a natural size, so scale it down on narrow screens
+     but never blow it up beyond it */
+  svg#plot { display:block; width:100%; max-width:720px; height:auto;
+             margin:0 auto; touch-action:none; }
+  .hint { font-size:11px; color:#777; text-align:right; padding:0 4px 2px 0; }
 
-  .eyebrow {
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--blueprint);
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
-
-  h1 {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: clamp(24px, 3.4vw, 36px);
-    margin: 0 0 8px;
-    letter-spacing: -0.01em;
-  }
-
-  header p {
-    margin: 0;
-    max-width: 640px;
-    color: var(--ink-soft);
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
-
-  .layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr);
-    gap: 24px;
-    align-items: start;
-  }
-
-  @media (max-width: 880px) {
-    .layout { grid-template-columns: 1fr; }
-  }
-
-  .panel {
-    background: var(--paper-raised);
-    border: 1px solid var(--line);
-    border-radius: 3px;
-  }
-
-  .plot-panel { padding: 16px 16px 8px; }
-
-  .plot-toolbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 6px;
-    font-size: 11px;
-    color: var(--ink-soft);
-  }
-
-  .plot-toolbar .hint { letter-spacing: 0.02em; }
-
-  svg#plot { width: 100%; height: auto; display: block; touch-action: none; }
-
-  .pt-label {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .axis-label {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 15px;
-    fill: var(--ink);
-  }
-
-  .tick-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    fill: var(--ink-soft);
-  }
-
-  .side { display: flex; flex-direction: column; gap: 16px; }
-
-  .card { padding: 16px 18px; }
-
-  .card h2 {
-    font-family: var(--display);
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 12px;
-    color: var(--ink-soft);
-    font-weight: 600;
-  }
-
-  .segmented {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border: 1px solid var(--line-strong);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .segmented button {
-    font-family: var(--mono);
-    font-size: 12px;
-    padding: 9px 6px;
-    border: none;
-    background: var(--paper);
-    color: var(--ink-soft);
-    cursor: pointer;
-    transition: background .12s ease, color .12s ease;
-    border-left: 1px solid var(--line-strong);
-  }
-  .segmented button:first-child { border-left: none; }
-
-  .segmented button.active {
-    background: var(--blueprint);
-    color: #fff;
-  }
-
-  .field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .field { display: flex; flex-direction: column; gap: 4px; }
-
-  .field label {
-    font-size: 10.5px;
-    color: var(--ink-soft);
-    letter-spacing: 0.03em;
-  }
-
-  .field input[type=number] {
-    font-family: var(--mono);
-    font-variant-numeric: tabular-nums;
-    font-size: 13px;
-    padding: 7px 8px;
-    border: 1px solid var(--line-strong);
-    border-radius: 2px;
-    background: var(--paper);
-    color: var(--ink);
-    width: 100%;
-  }
-  .field input[type=number]:focus {
-    outline: 2px solid var(--blueprint-soft);
-    outline-offset: 0;
-  }
-
-  .coord-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12.5px;
-    margin-top: 4px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .plot-toolbar math {
-    font-size: 16px;
-    color: var(--ink);
-  }
-  .plot-toolbar .eq-sep { display: inline-block; width: 22px; }
-  .coord-table th {
-    text-align: left;
-    font-weight: 500;
-    color: var(--ink-soft);
-    font-size: 10.5px;
-    padding: 4px 6px;
-    border-bottom: 1px solid var(--line);
-  }
-  .coord-table td {
-    padding: 5px 6px;
-    border-bottom: 1px solid var(--line);
-  }
-  .coord-table tr:last-child td { border-bottom: none; }
+  table.pts { width:100%; max-width:720px; border-collapse:collapse; font-size:11px;
+              font-variant-numeric:tabular-nums; margin:4px auto 0; }
+  table.pts th { text-align:left; font-weight:500; color:#777; font-size:10px;
+                 letter-spacing:.04em; text-transform:uppercase;
+                 padding:3px 6px; border-bottom:1px solid var(--brd); }
+  table.pts td { padding:3px 6px; border-bottom:1px solid #ececec; color:#333; }
+  table.pts tr:last-child td { border-bottom:none; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
 
-  .lf-readout {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-  }
+  footer { font-size:11px; color:#777; margin:10px 0 20px; }
+  code { font-family:ui-monospace,Consolas,monospace; background:#e8e8e8;
+         padding:0 3px; border-radius:2px; }
 
-  .lf-value {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 44px;
-    line-height: 1;
-  }
-
-  .lf-status {
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 3px 8px;
-    border-radius: 2px;
-    font-weight: 600;
-  }
-  .status-pass { background: rgba(56,102,65,0.12); color: var(--green); }
-  .status-fail { background: rgba(168,51,31,0.12); color: var(--red); }
-
-  .lf-note {
-    margin-top: 8px;
-    font-size: 11.5px;
-    color: var(--ink-soft);
-    line-height: 1.5;
-  }
-
-  .error-box {
-    margin-top: 8px;
-    font-size: 12px;
-    color: var(--red);
-    background: var(--red-fill);
-    border: 1px solid rgba(168,51,31,0.25);
-    border-radius: 2px;
-    padding: 8px 10px;
-    line-height: 1.5;
-  }
-
-  .reset-btn {
-    font-family: var(--mono);
-    font-weight: 600;
-    font-size: 12px;
-    padding: 9px 12px;
-    border: 1px solid var(--blueprint);
-    background: var(--blueprint);
-    color: #fff;
-    border-radius: 2px;
-    cursor: pointer;
-    width: 100%;
-    margin-top: 12px;
-  }
-  .reset-btn:hover { background: #003a75; border-color: #003a75; }
-
-  .legend {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 11.5px;
-    color: var(--ink-soft);
-  }
-
-footer{
-    text-align:left; font-size:.8rem; font-style:italic; color:var(--muted);
-    margin-top:24px; padding-top:12px; border-top:1px solid var(--border);
-  }
+  /* SVG text, in the same family and sizes as the page */
+  .pt-label  { font:600 11px system-ui,"Segoe UI",Helvetica,Arial,sans-serif; }
+  .axis-label{ font:italic 13px system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+               fill:var(--ink); }
+  .tick-label{ font:10px system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
+               fill:var(--ink-soft); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-	<h1>M&ndash;N Interaction Diagram</h1>
-    <p>Drag p1 (permanent load) and p2 (permanent + live load) on the plot. The load path is extended to p3, where it crosses the failure envelope, and the load factor LF = (n3&minus;n1)/(n2&minus;n1) is reported live.</p>
-  </header>
 
-  <div class="layout">
-    <div class="panel plot-panel">
-      <div class="plot-toolbar">
-        <span>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <mi>n</mi><mo>=</mo>
-            <mfrac>
-              <mi>N</mi>
-              <mrow><mi>b</mi><mi>h</mi><msub><mi>f</mi><mi>c</mi></msub></mrow>
-            </mfrac>
-          </math>
-          <span class="eq-sep"></span>
-          <math xmlns="http://www.w3.org/1998/Math/MathML">
-            <mi>m</mi><mo>=</mo>
-            <mfrac>
-              <mi>M</mi>
-              <mrow><mi>b</mi><msup><mi>h</mi><mn>2</mn></msup><msub><mi>f</mi><mi>c</mi></msub></mrow>
-            </mfrac>
-          </math>
-        </span>
-        <span class="hint">drag p1 / p2</span>
-      </div>
-      <svg id="plot" viewBox="0 0 720 470" xmlns="http://www.w3.org/2000/svg"></svg>
-    </div>
+<h1>M&ndash;N interaction capacity <span>&middot; rectangular section, load factor to the failure envelope</span></h1>
 
-    <div class="side">
-      <div class="panel card">
-        <h2>Envelope stage</h2>
-        <div class="segmented" id="stageToggle">
-          <button data-lim="e" class="active">Elastic &middot; Stage II</button>
-          <button data-lim="c">Concrete &middot; Stage III</button>
-        </div>
-        <div class="field-row" id="alphaBetaRow" style="display:none;">
-          <div class="field">
-            <label for="alphaIn">&alpha; (compressive strength factor)</label>
-            <input type="number" id="alphaIn" value="0.8" step="0.01" min="0.01" max="1">
-          </div>
-          <div class="field">
-            <label for="betaIn">&beta; (compression zone c.g.)</label>
-            <input type="number" id="betaIn" value="0.4" step="0.01" min="0.01" max="1">
-          </div>
-        </div>
-      </div>
-
-      <div class="panel card">
-        <h2>Load points</h2>
-        <div class="field-row">
-          <div class="field"><label for="n1In">n1</label><input type="number" id="n1In" step="0.01"></div>
-          <div class="field"><label for="m1In">m1</label><input type="number" id="m1In" step="0.01"></div>
-        </div>
-        <div class="field-row">
-          <div class="field"><label for="n2In">n2</label><input type="number" id="n2In" step="0.01"></div>
-          <div class="field"><label for="m2In">m2</label><input type="number" id="m2In" step="0.01"></div>
-        </div>
-        <table class="coord-table">
-          <thead><tr><th>point</th><th>n</th><th>m</th></tr></thead>
-          <tbody>
-            <tr><td><span class="dot" style="background:var(--p1)"></span>p1</td><td id="p1n">&mdash;</td><td id="p1m">&mdash;</td></tr>
-            <tr><td><span class="dot" style="background:var(--p2)"></span>p2</td><td id="p2n">&mdash;</td><td id="p2m">&mdash;</td></tr>
-            <tr><td><span class="dot" style="background:var(--p3)"></span>p3</td><td id="p3n">&mdash;</td><td id="p3m">&mdash;</td></tr>
-          </tbody>
-        </table>
-        <button class="reset-btn" id="resetBtn">Reset to default points</button>
-      </div>
-
-      <div class="panel card">
-        <h2>Load factor</h2>
-        <div class="lf-readout">
-          <div class="lf-value" id="lfValue">&mdash;</div>
-          <div class="lf-status" id="lfStatus"></div>
-        </div>
-        <div class="lf-note">LF &ge; 1.0 means the section reaches p2 without exceeding the failure envelope. LF &lt; 1.0 means failure occurs before p2 is reached.</div>
-        <div class="error-box" id="errorBox" style="display:none;"></div>
-      </div>
+<div class="panel">
+  <div class="grp">
+    <b>Envelope</b>
+    <div class="fld"><label>stage</label>
+      <select id="stageSel">
+        <option value="e">elastic, II</option>
+        <option value="c">concrete, III</option>
+      </select></div>
+    <div id="alphaBetaRow">
+      <div class="fld"><label title="compressive strength factor">&alpha;</label>
+        <input type="number" id="alphaIn" value="0.8" step="0.01" min="0.01" max="1"></div>
+      <div class="fld"><label title="centre of gravity of the compression zone">&beta;</label>
+        <input type="number" id="betaIn" value="0.4" step="0.01" min="0.01" max="1"></div>
     </div>
   </div>
+
+  <div class="grp">
+    <b>p1 &middot; permanent</b>
+    <div class="fld"><label>n1</label><input type="number" id="n1In" step="0.01"></div>
+    <div class="fld"><label>m1</label><input type="number" id="m1In" step="0.01"></div>
+  </div>
+
+  <div class="grp">
+    <b>p2 &middot; + live</b>
+    <div class="fld"><label>n2</label><input type="number" id="n2In" step="0.01"></div>
+    <div class="fld"><label>m2</label><input type="number" id="m2In" step="0.01"></div>
+  </div>
+
+  <div class="grp">
+    <b>Load factor</b>
+    <div class="lf"><b id="lfValue">&mdash;</b><span class="lf-status" id="lfStatus"></span></div>
+    <div class="note">LF = (n3&minus;n1)/(n2&minus;n1),<br>&ge; 1.0 passes</div>
+  </div>
+
+  <div class="bar">
+    <button id="resetBtn">Reset points</button>
+    <span id="errorBox" style="display:none;"></span>
+  </div>
+</div>
+
+<div class="figs">
+  <div class="hint">drag p1 and p2 on the plot &middot; the load path is extended to p3 on the envelope</div>
+  <svg id="plot" viewBox="0 0 720 470" xmlns="http://www.w3.org/2000/svg"></svg>
+  <table class="pts">
+    <thead><tr><th>point</th><th>n</th><th>m</th><th>meaning</th></tr></thead>
+    <tbody>
+      <tr><td><span class="dot" style="background:var(--p1)"></span>p1</td>
+          <td id="p1n">&mdash;</td><td id="p1m">&mdash;</td><td>permanent load</td></tr>
+      <tr><td><span class="dot" style="background:var(--p2)"></span>p2</td>
+          <td id="p2n">&mdash;</td><td id="p2m">&mdash;</td><td>permanent + live load</td></tr>
+      <tr><td><span class="dot" style="background:var(--p3)"></span>p3</td>
+          <td id="p3n">&mdash;</td><td id="p3m">&mdash;</td><td>where the path meets the envelope</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  Dimensionless axial force <code>n = N / (b h f<sub>c</sub>)</code> and moment
+  <code>m = M / (b h&sup2; f<sub>c</sub>)</code>.
+  Failure envelope <code>m = 0.5n &minus; (2/3)n&sup2;</code> up to n = 0.75 for the elastic
+  stage II, and <code>m = 0.5n &minus; (&beta;/&alpha;)n&sup2;</code> up to n = 2&beta;/&alpha; for
+  the concrete stage III, symmetric about m = 0.
+  The load path from p1 through p2 is extended to its intersection p3 with that envelope;
+  LF is how far along the permanent-to-live path the section gets before it is reached.
+  Mirrors <code>MN_cap.m</code>.
+</footer>
+
 </div>
 
 <script>
@@ -658,12 +441,8 @@ footer{
   }
 
   // ---------- UI wiring ----------
-  document.getElementById('stageToggle').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
-    document.querySelectorAll('#stageToggle button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    state.lim = btn.dataset.lim;
+  document.getElementById('stageSel').addEventListener('change', (e) => {
+    state.lim = e.target.value;
     document.getElementById('alphaBetaRow').style.display = (state.lim === 'c') ? 'grid' : 'none';
     const { nMax, m: mFunc } = envelopeFn(state.lim, state.alpha, state.beta);
     drawEnvelope(nMax, mFunc);
@@ -707,6 +486,5 @@ footer{
   render();
 })();
 </script>
-<footer>Last updated 2026-07-14 </footer>
 </body>
 </html>
