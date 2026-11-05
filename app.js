@@ -607,6 +607,8 @@ function printHTML(title, body) {
       .side { display: flex; align-items: center; justify-content: space-between; }
       .side figure { flex: none; width: 120mm; }
       .side > div { flex: none; width: 48mm; }
+      .side th, .side td { padding: 1pt 3pt; }
+      .side table { margin: 2pt 0 3pt auto; }
       .note { font-size: 10pt; text-align: center; }`;
     const fr = document.createElement('iframe');
     fr.style.cssText = 'position:fixed; right:0; bottom:0; width:0; height:0; border:0';
