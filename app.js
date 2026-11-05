@@ -165,6 +165,16 @@ function buildPlot() {
         c.addEventListener('pointermove', onMove);
         c.addEventListener('pointerup', onUp);
         c.addEventListener('pointercancel', onUp);
+        // a phone: touch-action alone does not always hold on an element inside an svg, the
+        // browser then takes the gesture for a scroll and ends the drag.  So refuse the scroll
+        // here, and follow the finger from the touch events too
+        c.addEventListener('touchstart', ev => { ev.preventDefault(); drag = k + 1; }, { passive: false });
+        c.addEventListener('touchmove', ev => {
+            ev.preventDefault();
+            if (ev.touches.length) moveTo(ev.touches[0].clientX, ev.touches[0].clientY);
+        }, { passive: false });
+        c.addEventListener('touchend', ev => { ev.preventDefault(); onUp(); }, { passive: false });
+        c.addEventListener('touchcancel', onUp);
         return c;
     });
 }
@@ -482,23 +492,37 @@ function onReset() {
 function onDown(k, ev) {
     ev.preventDefault();
     drag = k;
-    ev.currentTarget.setPointerCapture(ev.pointerId);
+    try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* the touch events follow it */ }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
 function onMove(ev) {
     if (!drag) return;
     ev.preventDefault();
+    moveTo(ev.clientX, ev.clientY);
+}
+// the point to the pointer, one redraw per frame, the last position counts
+let pending = null;
+function moveTo(cx, cy) {
+    if (!drag) return;
+    if (!pending) setTimeout(() => { const q = pending; pending = null; if (q) applyMove(q); }, 16);
+    pending = { x: cx, y: cy, k: drag };
+}
+function applyMove(m) {
+    const k = m.k;
     const svg = $('res'), pt = svg.createSVGPoint();
-    pt.x = ev.clientX; pt.y = ev.clientY;
+    pt.x = m.x; pt.y = m.y;
     const q = pt.matrixTransform(svg.getScreenCTM().inverse());
     const r3 = v => Math.round(v * 1000) / 1000;
     const p = [r3(Math.min(Math.max(LIMS[0] + (q.x - AX.x) / AX.w * (LIMS[1] - LIMS[0]), LIMS[0]), LIMS[1])),
                r3(Math.min(Math.max(LIMS[2] + (AX.y + AX.h - q.y) / AX.h * (LIMS[3] - LIMS[2]), LIMS[2]), LIMS[3]))];
-    if (drag === 1) inp.p1 = clampP1(p).p; else inp.p2 = p;
+    if (k === 1) inp.p1 = clampP1(p).p; else inp.p2 = p;
     syncBoxes();
     update();
 }
-function onUp() { drag = 0; }
+function onUp() {
+    drag = 0;
+    if (pending) { const q = pending; pending = null; applyMove(q); }    // the last position
+}
 
 // ------------------------------------------------------------------------- report
 const SPAN = (a, b) => `<i>${a}</i><sub>${b}</sub>`;
