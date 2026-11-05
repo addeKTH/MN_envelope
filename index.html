@@ -1,491 +1,117 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=600">
 <title>M-N interaction capacity</title>
+<!--
+  M-N interaction capacity: web version of Main_gui.m / MN_envelope.m.
+  Layout as the MATLAB figure, 560 x 800 px; viewport 600 px, so that a phone shows the whole width.
+  Andreas Andersson, 2026-11-05 (assisted by Claude)
+-->
 <style>
-  /* Same visual language as the railway bridge static analysis page: grey
-     ground, near-white panels, one compact control panel on top and the
-     figure below, small system type throughout.  The variable names are the
-     ones the script already uses to colour the SVG, so only their values
-     change here. */
-  :root {
-    --bg:    #f0f0f0;          /* page */
-    --pan:   #fafafa;          /* panel */
-    --brd:   #d5d5d5;          /* panel border */
-    --ink:   #222;
-    --paper: #ffffff;          /* plot area and input background */
-    --line:  #e6e6e6;          /* grid lines */
-    --line-strong: #333333;    /* axes and plot frame */
-    --ink-soft: #555555;       /* load path, tick labels */
-    --blueprint: #0059b3;      /* the capacity envelope, as the influence
-                                  line blue of the bridge page */
-    --safe-fill: rgba(0,89,179,0.10);
-    --p1: #404040;             /* permanent load */
-    --p2: #1a6b3c;             /* permanent + live */
-    --p3: #bf1a1a;             /* on the envelope, the load red of the
-                                  bridge page */
-    --green: #077033;
-    --red:   #a00000;
+  :root { --bg: #f0f0f0; --line: #bfbfbf; --grey: #4d4d4d; }
+  html, body { margin: 0; background: #e4e4e4; }
+  body { font: 12px "Segoe UI", system-ui, sans-serif; color: #000; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  #title { text-align: center; font-size: 20px; font-weight: 600; margin: 14px 0 0 0; }
+  #foot { text-align: center; padding: 6px 0 14px; font-size: 12px; color: #666; }
+  #fig { position: relative; width: 560px; height: 800px; margin: 10px auto; background: var(--bg);
+         box-shadow: 0 0 0 1px #c8c8c8; user-select: none; -webkit-user-select: none; }
+  .abs { position: absolute; }
+  .line { position: absolute; height: 1px; left: 10px; width: 540px; background: var(--line); }
+  .hdr { position: absolute; left: 10px; font-weight: bold; font-size: 14px; }
+  #msg { position: absolute; left: 300px; top: 8px; width: 250px; height: 18px; line-height: 18px; text-align: right;
+         font-size: 11px; color: #b30000; }
+  #msg.note { color: var(--grey); }
+  .lbl, .tex { font-family: "Times New Roman", Times, serif; white-space: nowrap; }
+  .lbl { position: absolute; width: 30px; height: 22px; line-height: 22px; text-align: right; font-size: 12.7px; }
+  .colh { position: absolute; font: 14px "Times New Roman", Times, serif; }
+  sub { font-size: 72%; line-height: 0; }
+  sup { font-size: 72%; line-height: 0; }
+  input.f { position: absolute; width: 56px; height: 22px; box-sizing: border-box; padding: 0 3px; border: 1px solid #7a7a7a;
+            background: #fff; font: 12px "Segoe UI", system-ui, sans-serif; border-radius: 0; }
+  #rst { position: absolute; left: 14px; top: 64px; width: 30px; height: 30px; cursor: pointer; padding: 0; border: 0; background: none;
+         touch-action: manipulation; }
+  #rst svg { display: block; width: 100%; height: 100%; }
+  #rst::after { content: ''; position: absolute; left: -7px; right: -7px; top: -7px; bottom: -7px; }
+  #rotBox { position: absolute; left: 266px; top: 42px; height: 68px; width: 284px; display: flex; align-items: center; cursor: pointer; }
+  #iRot { width: 16px; height: 16px; margin: 0 6px 0 2px; flex: none; }
+  #lRot { font-size: 14px; }
+  #eqTheta { display: none; align-items: center; font-size: 14.7px; }
+  #rotBox.on #lRot { display: none; }
+  #rotBox.on #eqTheta { display: inline-flex; }
+  /* equations */
+  .eq { position: absolute; font: 14.7px "Times New Roman", Times, serif; display: flex; align-items: center; white-space: nowrap; }
+  .frac { display: inline-flex; flex-direction: column; text-align: center; vertical-align: middle; margin: 0 2px; line-height: 1.12; }
+  .frac > span:first-child { border-bottom: 1px solid #000; padding: 0 2px 1px; }
+  .frac > span:last-child { padding: 1px 2px 0; }
+  .par { font-size: 36px; font-weight: 200; line-height: 1; transform: scaleX(0.65); display: inline-block; margin: 0 -3px; }
+  .brace { font-size: 40px; font-weight: 200; line-height: 1; transform: scaleX(0.6); display: inline-block; margin: 0 -2px; }
+  .rows { display: inline-grid; grid-template-columns: auto auto; column-gap: 12px; row-gap: 2px; }
+  .sp { display: inline-block; width: 4px; }
+  #gIII { position: absolute; left: 205px; top: 354px; display: grid; grid-template-columns: auto auto; column-gap: 4px; row-gap: 3px;
+          font: 14.7px "Times New Roman", Times, serif; white-space: nowrap; }
+  #expl { position: absolute; left: 58px; width: 400px; top: 428px; height: 20px; line-height: 20px; text-align: center;
+          font: 14.7px "Times New Roman", Times, serif; white-space: nowrap; }
+  /* a finger on p1 or p2 drags it; anywhere else on the plot the page scrolls as usual */
+  .hit { fill: transparent; stroke: none; pointer-events: all; cursor: grab; touch-action: none; }
+  svg.pass { pointer-events: none; }
+  svg.pass .hit { pointer-events: all; }
+  @media (pointer: coarse) {
+    input.f { font-size: 16px; padding: 0 2px; }      /* iOS zooms in on a smaller field */
+    #iRot { width: 22px; height: 22px; }
   }
-  * { box-sizing: border-box; }
-  body { margin:0; padding:12px; background:var(--bg); color:var(--ink);
-         font:13px/1.4 system-ui,"Segoe UI",Helvetica,Arial,sans-serif; }
-  h1 { font-size:15px; font-weight:600; margin:0 0 10px; }
-  h1 span { font-weight:400; color:#666; }
-  .wrap { max-width:900px; margin:0 auto; }
-
-  .panel { background:var(--pan); border:1px solid var(--brd); border-radius:4px;
-           padding:10px 12px; margin-bottom:10px;
-           display:grid; grid-template-columns:repeat(4,1fr); gap:4px 18px; }
-  .grp { display:flex; flex-direction:column; gap:4px; }
-  .grp > b { font-size:11px; text-transform:uppercase; letter-spacing:.04em;
-             color:#555; margin-bottom:2px; }
-  .fld { display:grid; grid-template-columns:62px 1fr; align-items:center; gap:6px; }
-  .fld label { font-size:11px; color:#444; }
-  input, select { font:12px inherit; font-family:inherit; padding:2px 4px;
-           border:1px solid #bbb; border-radius:3px; background:var(--paper); width:100%; }
-  input:disabled, select:disabled { background:#eee; color:#999; }
-  #alphaBetaRow { display:none; gap:4px; }
-
-  .lf { display:flex; align-items:baseline; gap:8px; margin-top:2px; }
-  .lf b { font-size:26px; font-weight:600; line-height:1;
-          font-variant-numeric:tabular-nums; }
-  .lf-status { font-size:10px; letter-spacing:.06em; text-transform:uppercase;
-          padding:2px 6px; border-radius:3px; font-weight:600; }
-  .status-pass { background:rgba(7,112,51,.12); color:var(--green); }
-  .status-fail { background:rgba(170,0,0,.12);  color:var(--red); }
-  .note { font-size:11px; color:#777; }
-
-  .bar { display:flex; align-items:center; gap:8px; grid-column:1/-1;
-         border-top:1px solid var(--brd); padding-top:8px; margin-top:2px; }
-  button { font:12px inherit; padding:3px 10px; border:1px solid #bbb; border-radius:3px;
-           background:#fff; cursor:pointer; }
-  button:hover { background:#eee; }
-  #errorBox { font-size:11px; color:var(--red); }
-
-  .figs { background:var(--pan); border:1px solid var(--brd); border-radius:4px;
-          padding:6px 10px 10px; }
-  /* the drawing has a natural size, so scale it down on narrow screens
-     but never blow it up beyond it */
-  svg#plot { display:block; width:100%; max-width:720px; height:auto;
-             margin:0 auto; touch-action:none; }
-  .hint { font-size:11px; color:#777; text-align:right; padding:0 4px 2px 0; }
-
-  table.pts { width:100%; max-width:720px; border-collapse:collapse; font-size:11px;
-              font-variant-numeric:tabular-nums; margin:4px auto 0; }
-  table.pts th { text-align:left; font-weight:500; color:#777; font-size:10px;
-                 letter-spacing:.04em; text-transform:uppercase;
-                 padding:3px 6px; border-bottom:1px solid var(--brd); }
-  table.pts td { padding:3px 6px; border-bottom:1px solid #ececec; color:#333; }
-  table.pts tr:last-child td { border-bottom:none; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
-
-  footer { font-size:11px; color:#777; margin:10px 0 20px; }
-  code { font-family:ui-monospace,Consolas,monospace; background:#e8e8e8;
-         padding:0 3px; border-radius:2px; }
-
-  /* SVG text, in the same family and sizes as the page */
-  .pt-label  { font:600 11px system-ui,"Segoe UI",Helvetica,Arial,sans-serif; }
-  .axis-label{ font:italic 13px system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
-               fill:var(--ink); }
-  .tick-label{ font:10px system-ui,"Segoe UI",Helvetica,Arial,sans-serif;
-               fill:var(--ink-soft); }
 </style>
 </head>
 <body>
-<div class="wrap">
+<h1 id="title">M-N interaction capacity</h1>
+<div id="fig">
+  <!-- input -->
+  <div class="hdr" style="top:8px">Input</div>
+  <div id="msg"></div>
+  <div class="line" style="top:28px"></div>
 
-<h1>M&ndash;N interaction capacity <span>&middot; rectangular section, load factor to the failure envelope</span></h1>
+  <div class="colh" style="left:78px; top:34px"><i>p</i><sub>1</sub></div>
+  <div class="colh" style="left:182px; top:34px"><i>p</i><sub>2</sub></div>
+  <div class="lbl" style="left:44px; top:56px"><i>n</i><sub>1</sub></div>
+  <input class="f" id="n1" style="left:78px; top:56px" autocomplete="off" title="Normalised normal force at p1, N/(b t f_cd)">
+  <div class="lbl" style="left:44px; top:82px"><i>m</i><sub>1</sub></div>
+  <input class="f" id="m1" style="left:78px; top:82px" autocomplete="off" title="Normalised moment at p1, M/(b t^2 f_cd)">
+  <div class="lbl" style="left:148px; top:56px"><i>n</i><sub>2</sub></div>
+  <input class="f" id="n2" style="left:182px; top:56px" autocomplete="off" title="Normalised normal force at p2, N/(b t f_cd)">
+  <div class="lbl" style="left:148px; top:82px"><i>m</i><sub>2</sub></div>
+  <input class="f" id="m2" style="left:182px; top:82px" autocomplete="off" title="Normalised moment at p2, M/(b t^2 f_cd)">
 
-<div class="panel">
-  <div class="grp">
-    <b>Envelope</b>
-    <div class="fld"><label>stage</label>
-      <select id="stageSel">
-        <option value="e">elastic, II</option>
-        <option value="c">concrete, III</option>
-      </select></div>
-    <div id="alphaBetaRow">
-      <div class="fld"><label title="compressive strength factor">&alpha;</label>
-        <input type="number" id="alphaIn" value="0.8" step="0.01" min="0.01" max="1"></div>
-      <div class="fld"><label title="centre of gravity of the compression zone">&beta;</label>
-        <input type="number" id="betaIn" value="0.4" step="0.01" min="0.01" max="1"></div>
-    </div>
+  <button id="rst" type="button" title="Reset: default input" aria-label="Reset: default input"></button>
+
+  <label id="rotBox" title="Rotation limit: edge strain eps_cu, limits psi_III">
+    <input type="checkbox" id="iRot">
+    <span id="lRot" class="tex"><i>θ</i><sub>cap</sub></span>
+    <span id="eqTheta" class="tex"><i>θ</i><sub>cap</sub>&nbsp;=&nbsp;<span class="par">(</span><span class="frac"><span><i>ε</i><sub>cu</sub></span><span><i>x</i><sub>cu</sub></span></span>&nbsp;−&nbsp;<span class="frac"><span><i>f</i><sub>cd</sub></span><span><i>E</i><sub>c</sub>&#8201;<i>x</i><sub>c</sub></span></span><span class="par">)</span>&#8201;<i>l</i><sub>p</sub></span>
+  </label>
+
+  <!-- model -->
+  <div class="hdr" style="top:114px">Model</div>
+  <div class="line" style="top:134px"></div>
+  <svg id="model" class="abs pass" style="left:10px; top:133px; overflow:visible" width="540" height="142"></svg>
+
+  <div class="eq" style="left:26px; top:292px; height:44px"><i>n</i>&nbsp;=&nbsp;<span class="frac"><span><i>N</i></span><span><i>b</i>&#8201;<i>t</i>&#8201;<i>f</i><sub>cd</sub></span></span>,<span class="sp"></span><span class="sp"></span><span class="sp"></span><i>m</i>&nbsp;=&nbsp;<span class="frac"><span><i>M</i></span><span><i>b</i>&#8201;<i>t</i><sup>2</sup>&#8201;<i>f</i><sub>cd</sub></span></span></div>
+  <div class="eq" style="left:26px; top:340px; height:40px"><i>ψ</i>&nbsp;=&nbsp;<span class="frac"><span><i>n</i><sub>3</sub>&nbsp;−&nbsp;<i>n</i><sub>1</sub></span><span><i>n</i><sub>2</sub>&nbsp;−&nbsp;<i>n</i><sub>1</sub></span></span></div>
+  <div class="eq" style="left:205px; top:292px; height:44px">|<i>m</i>|<sub>II</sub>&nbsp;≤&nbsp;<span class="brace">{</span><span class="rows"><span><i>n</i>/2&nbsp;−&nbsp;2<i>n</i><sup>2</sup>/3,</span><span>0&nbsp;≤&nbsp;<i>n</i>&nbsp;≤&nbsp;0.5</span><span>(1&nbsp;−&nbsp;<i>n</i>)/6,</span><span>0.5&nbsp;≤&nbsp;<i>n</i>&nbsp;≤&nbsp;1</span></span></div>
+  <div id="gIII">
+    <span>|<i>m</i>|<sub>III</sub>&nbsp;≤</span><span><i>n</i>/2&nbsp;−&nbsp;(<i>β</i>/<i>α</i>)&#8201;<i>n</i><sup>2</sup>,&nbsp;&nbsp;&nbsp;0&nbsp;≤&nbsp;<i>n</i>&nbsp;≤&nbsp;1</span>
+    <span></span><span><i>α</i>&nbsp;=&nbsp;0.8,&nbsp;&nbsp;&nbsp;<i>β</i>&nbsp;=&nbsp;0.4</span>
   </div>
 
-  <div class="grp">
-    <b>p1 &middot; permanent</b>
-    <div class="fld"><label>n1</label><input type="number" id="n1In" step="0.01"></div>
-    <div class="fld"><label>m1</label><input type="number" id="m1In" step="0.01"></div>
-  </div>
-
-  <div class="grp">
-    <b>p2 &middot; + live</b>
-    <div class="fld"><label>n2</label><input type="number" id="n2In" step="0.01"></div>
-    <div class="fld"><label>m2</label><input type="number" id="m2In" step="0.01"></div>
-  </div>
-
-  <div class="grp">
-    <b>Load factor</b>
-    <div class="lf"><b id="lfValue">&mdash;</b><span class="lf-status" id="lfStatus"></span></div>
-    <div class="note">LF = (n3&minus;n1)/(n2&minus;n1),<br>&ge; 1.0 passes</div>
-  </div>
-
-  <div class="bar">
-    <button id="resetBtn">Reset points</button>
-    <span id="errorBox" style="display:none;"></span>
-  </div>
+  <!-- results -->
+  <div class="hdr" style="top:398px">Results</div>
+  <div class="line" style="top:418px"></div>
+  <div id="expl"><i>p</i><sub>1</sub>: <i>Q</i><sub>perm</sub>&emsp;<i>p</i><sub>2</sub>: <i>Q</i><sub>perm</sub> + <i>Q</i><sub>live</sub>&emsp;<i>p</i><sub>3</sub>: <i>Q</i><sub>perm</sub> + <i>ψ</i>&#8201;<i>Q</i><sub>live</sub></div>
+  <svg id="res" class="abs pass" style="left:0; top:420px" width="560" height="380"></svg>
 </div>
-
-<div class="figs">
-  <div class="hint">drag p1 and p2 on the plot &middot; the load path is extended to p3 on the envelope</div>
-  <svg id="plot" viewBox="0 0 720 470" xmlns="http://www.w3.org/2000/svg"></svg>
-  <table class="pts">
-    <thead><tr><th>point</th><th>n</th><th>m</th><th>meaning</th></tr></thead>
-    <tbody>
-      <tr><td><span class="dot" style="background:var(--p1)"></span>p1</td>
-          <td id="p1n">&mdash;</td><td id="p1m">&mdash;</td><td>permanent load</td></tr>
-      <tr><td><span class="dot" style="background:var(--p2)"></span>p2</td>
-          <td id="p2n">&mdash;</td><td id="p2m">&mdash;</td><td>permanent + live load</td></tr>
-      <tr><td><span class="dot" style="background:var(--p3)"></span>p3</td>
-          <td id="p3n">&mdash;</td><td id="p3m">&mdash;</td><td>where the path meets the envelope</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<footer>
-  Dimensionless axial force <code>n = N / (b h f<sub>c</sub>)</code> and moment
-  <code>m = M / (b h&sup2; f<sub>c</sub>)</code>.
-  Failure envelope <code>m = 0.5n &minus; (2/3)n&sup2;</code> up to n = 0.75 for the elastic
-  stage II, and <code>m = 0.5n &minus; (&beta;/&alpha;)n&sup2;</code> up to n = 2&beta;/&alpha; for
-  the concrete stage III, symmetric about m = 0.
-  The load path from p1 through p2 is extended to its intersection p3 with that envelope;
-  LF is how far along the permanent-to-live path the section gets before it is reached.
-  Mirrors <code>MN_cap.m</code>.
-</footer>
-<footer>Last updated 2026-07-31 </footer>
-</div>
-
-<script>
-(function(){
-  "use strict";
-
-  // ---------- state ----------
-  const state = {
-    lim: 'e',
-    alpha: 0.8,
-    beta: 0.4,
-    n1: 0.1, m1: 0.01,
-    n2: 0.2, m2: 0.03
-  };
-
-  const DEFAULTS = { n1: 0.1, m1: 0.01, n2: 0.2, m2: 0.03 };
-
-  // ---------- plot geometry ----------
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.getElementById('plot');
-  const M = { left: 56, right: 690, top: 26, bottom: 400 };
-  const DOMAIN = { nMin: 0, nMax: 1.0, mMin: -0.2, mMax: 0.2 };
-
-  function sx(n){ return M.left + (n - DOMAIN.nMin) / (DOMAIN.nMax - DOMAIN.nMin) * (M.right - M.left); }
-  function sy(m){ return M.bottom - (m - DOMAIN.mMin) / (DOMAIN.mMax - DOMAIN.mMin) * (M.bottom - M.top); }
-  function invx(x){ return DOMAIN.nMin + (x - M.left) / (M.right - M.left) * (DOMAIN.nMax - DOMAIN.nMin); }
-  function invy(y){ return DOMAIN.mMin + (M.bottom - y) / (M.bottom - M.top) * (DOMAIN.mMax - DOMAIN.mMin); }
-
-  function el(tag, attrs){
-    const e = document.createElementNS(svgNS, tag);
-    for (const k in attrs) e.setAttribute(k, attrs[k]);
-    return e;
-  }
-
-  // ---------- math: mirrors MN_cap.m ----------
-  function envelopeFn(lim, alpha, beta){
-    if (lim === 'e') {
-      return { m: n => 0.5*n - n*n*(2/3), nMax: 0.75 };
-    } else {
-      return { m: n => 0.5*n - n*n*(beta/alpha), nMax: 2*beta/alpha };
-    }
-  }
-
-  function mnCap(n1, m1, n2in, m2, lim, alpha, beta){
-    let n2 = n2in;
-    if (n2 === n1) n2 = n1 + 1e-6;
-    const k = (m2 - m1) / (n2 - n1);
-    const { m: mFunc, nMax } = envelopeFn(lim, alpha, beta);
-
-    let np;
-    if (lim === 'e') {
-      const disc1 = Math.pow(k-0.5,2) - (m1 - n1*k) * 8/3;
-      const disc2 = Math.pow(k+0.5,2) + (m1 - n1*k) * 8/3;
-      np = [
-        0.75*((0.5-k) + Math.sqrt(disc1)),
-        0.75*((0.5-k) - Math.sqrt(disc1)),
-        0.75*((0.5+k) + Math.sqrt(disc2)),
-        0.75*((0.5+k) - Math.sqrt(disc2))
-      ];
-    } else {
-      const c = 0.5*alpha/beta;
-      const disc1 = Math.pow(k-0.5,2) - 4*(beta/alpha)*(m1 - n1*k);
-      const disc2 = Math.pow(k+0.5,2) + 4*(beta/alpha)*(m1 - n1*k);
-      np = [
-        c*((0.5-k) + Math.sqrt(disc1)),
-        c*((0.5-k) - Math.sqrt(disc1)),
-        c*((0.5+k) + Math.sqrt(disc2)),
-        c*((0.5+k) - Math.sqrt(disc2))
-      ];
-    }
-
-    if (n1 < 0) return { error: 'n1 must be positive.', nMax, mFunc };
-    if (n1 > nMax) return { error: `n1 must be less than n_max (${nMax.toFixed(3)}).`, nMax, mFunc };
-    if (Math.abs(m1) > Math.abs(mFunc(n1)) + 1e-9) return { error: 'p1 exceeds the failure envelope.', nMax, mFunc };
-
-    const mL = n => m1 + (n - n1) * (m2 - m1) / (n2 - n1);
-    const eps = 1e-9;
-    let candidates;
-    if (n2 >= n1) {
-      candidates = np.filter(v => !isNaN(v) && v >= n1 - eps && v <= nMax + eps);
-    } else {
-      candidates = np.filter(v => !isNaN(v) && v >= 0 - eps && v < n1);
-    }
-    if (candidates.length === 0) return { error: 'No intersection with the envelope found for this load path.', nMax, mFunc };
-
-    const n3 = Math.max(...candidates);
-    const m3 = mL(n3);
-    const LF = (n3 - n1) / (n2 - n1);
-    return { LF, n3, m3, nMax, mFunc, error: null };
-  }
-
-  // ---------- static grid (drawn once per stage change) ----------
-  let gEnvelope, gGrid, gDynamic;
-
-  function buildStaticLayers(){
-    svg.innerHTML = '';
-    gGrid = el('g', {});
-    gEnvelope = el('g', {});
-    gDynamic = el('g', {});
-    svg.appendChild(gGrid);
-    svg.appendChild(gEnvelope);
-    svg.appendChild(gDynamic);
-    drawGrid();
-  }
-
-  function drawGrid(){
-    gGrid.innerHTML = '';
-    // background
-    gGrid.appendChild(el('rect', { x: M.left, y: M.top, width: M.right-M.left, height: M.bottom-M.top, fill: 'var(--paper)', stroke: 'none' }));
-
-    // vertical gridlines every 0.1 in n
-    for (let n = 0; n <= 1.0001; n += 0.1) {
-      const x = sx(n);
-      gGrid.appendChild(el('line', { x1:x, y1:M.top, x2:x, y2:M.bottom, stroke: 'var(--line)', 'stroke-width': 1 }));
-      const t = el('text', { x: x, y: M.bottom + 16, class: 'tick-label', 'text-anchor': 'middle' });
-      t.textContent = n.toFixed(1);
-      gGrid.appendChild(t);
-    }
-    // horizontal gridlines every 0.05 in m
-    for (let m = -0.2; m <= 0.2001; m += 0.05) {
-      const y = sy(m);
-      gGrid.appendChild(el('line', { x1:M.left, y1:y, x2:M.right, y2:y, stroke: 'var(--line)', 'stroke-width': 1 }));
-      const t = el('text', { x: M.left - 10, y: y+3, class: 'tick-label', 'text-anchor': 'end' });
-      t.textContent = m.toFixed(2);
-      gGrid.appendChild(t);
-    }
-    // axes (n-axis at m=0, m-axis at n=0)
-    gGrid.appendChild(el('line', { x1:M.left, y1:sy(0), x2:M.right, y2:sy(0), stroke: 'var(--line-strong)', 'stroke-width': 1.4 }));
-    gGrid.appendChild(el('line', { x1:sx(0), y1:M.top, x2:sx(0), y2:M.bottom, stroke: 'var(--line-strong)', 'stroke-width': 1.4 }));
-
-    // axis labels
-    const xl = el('text', { x: (M.left+M.right)/2, y: M.bottom + 34, class: 'axis-label', 'text-anchor':'middle' });
-    xl.textContent = 'n';
-    gGrid.appendChild(xl);
-    const yl = el('text', { x: 18, y: (M.top+M.bottom)/2, class: 'axis-label', 'text-anchor':'middle' });
-    yl.textContent = 'm';
-    gGrid.appendChild(yl);
-
-    // border
-    gGrid.appendChild(el('rect', { x: M.left, y: M.top, width: M.right-M.left, height: M.bottom-M.top, fill: 'none', stroke: 'var(--line-strong)', 'stroke-width': 1 }));
-  }
-
-  function drawEnvelope(nMax, mFunc){
-    gEnvelope.innerHTML = '';
-    const N = 60;
-    const top = [], bot = [];
-    for (let i = 0; i <= N; i++) {
-      const n = nMax * i / N;
-      top.push([n, mFunc(n)]);
-      bot.push([n, -mFunc(n)]);
-    }
-    const poly = top.concat(bot.slice().reverse());
-    const d = poly.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ') + ' Z';
-    gEnvelope.appendChild(el('path', { d, fill: 'var(--safe-fill)', stroke: 'none' }));
-
-    const dTop = top.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ');
-    const dBot = bot.map((p,i) => `${i===0?'M':'L'} ${sx(p[0]).toFixed(2)} ${sy(p[1]).toFixed(2)}`).join(' ');
-    gEnvelope.appendChild(el('path', { d: dTop, fill: 'none', stroke: 'var(--blueprint)', 'stroke-width': 2 }));
-    gEnvelope.appendChild(el('path', { d: dBot, fill: 'none', stroke: 'var(--blueprint)', 'stroke-width': 2 }));
-  }
-
-  // ---------- dynamic layer: load line + points ----------
-  let dragTarget = null;
-
-  function pointerToDomain(evt){
-    const pt = svg.createSVGPoint();
-    pt.x = evt.clientX; pt.y = evt.clientY;
-    const ctm = svg.getScreenCTM().inverse();
-    const loc = pt.matrixTransform(ctm);
-    return { n: invx(loc.x), m: invy(loc.y) };
-  }
-
-  function makeDraggable(circleEl, key){
-    circleEl.addEventListener('pointerdown', (e) => {
-      dragTarget = key;
-      circleEl.setPointerCapture(e.pointerId);
-    });
-  }
-
-  svg.addEventListener('pointermove', (e) => {
-    if (!dragTarget) return;
-    const { n, m } = pointerToDomain(e);
-    const nc = Math.min(Math.max(n, DOMAIN.nMin), DOMAIN.nMax);
-    const mc = Math.min(Math.max(m, DOMAIN.mMin), DOMAIN.mMax);
-    if (dragTarget === 'p1') { state.n1 = round3(nc); state.m1 = round3(mc); }
-    else { state.n2 = round3(nc); state.m2 = round3(mc); }
-    syncInputs();
-    render();
-  });
-  svg.addEventListener('pointerup', () => { dragTarget = null; });
-  svg.addEventListener('pointercancel', () => { dragTarget = null; });
-
-  function round3(v){ return Math.round(v*1000)/1000; }
-
-  function render(){
-    const result = mnCap(state.n1, state.m1, state.n2, state.m2, state.lim, state.alpha, state.beta);
-
-    gDynamic.innerHTML = '';
-
-    // load line p1 -> p2 (solid)
-    gDynamic.appendChild(el('line', {
-      x1: sx(state.n1), y1: sy(state.m1), x2: sx(state.n2), y2: sy(state.m2),
-      stroke: 'var(--ink-soft)', 'stroke-width': 1.6
-    }));
-
-    if (!result.error) {
-      // extension p2 -> p3 (dashed)
-      gDynamic.appendChild(el('line', {
-        x1: sx(state.n2), y1: sy(state.m2), x2: sx(result.n3), y2: sy(result.m3),
-        stroke: 'var(--ink-soft)', 'stroke-width': 1.4, 'stroke-dasharray': '5 4'
-      }));
-      // p3 point
-      gDynamic.appendChild(el('circle', { cx: sx(result.n3), cy: sy(result.m3), r: 6, fill: 'var(--p3)', stroke: '#fff', 'stroke-width': 1.5 }));
-      const lbl3 = el('text', { x: sx(result.n3)+9, y: sy(result.m3)-8, class: 'pt-label', fill: 'var(--p3)' });
-      lbl3.textContent = 'p3';
-      gDynamic.appendChild(lbl3);
-    }
-
-    // p1
-    const c1 = el('circle', { cx: sx(state.n1), cy: sy(state.m1), r: 7, fill: 'var(--p1)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
-    gDynamic.appendChild(c1);
-    const lbl1 = el('text', { x: sx(state.n1)+10, y: sy(state.m1)-9, class: 'pt-label', fill: 'var(--p1)' });
-    lbl1.textContent = 'p1';
-    gDynamic.appendChild(lbl1);
-    makeDraggable(c1, 'p1');
-
-    // p2
-    const c2 = el('circle', { cx: sx(state.n2), cy: sy(state.m2), r: 7, fill: 'var(--p2)', stroke: '#fff', 'stroke-width': 1.5, style: 'cursor:grab' });
-    gDynamic.appendChild(c2);
-    const lbl2 = el('text', { x: sx(state.n2)+10, y: sy(state.m2)-9, class: 'pt-label', fill: 'var(--p2)' });
-    lbl2.textContent = 'p2';
-    gDynamic.appendChild(lbl2);
-    makeDraggable(c2, 'p2');
-
-    // side panel updates
-    document.getElementById('p1n').textContent = state.n1.toFixed(3);
-    document.getElementById('p1m').textContent = state.m1.toFixed(3);
-    document.getElementById('p2n').textContent = state.n2.toFixed(3);
-    document.getElementById('p2m').textContent = state.m2.toFixed(3);
-
-    const errorBox = document.getElementById('errorBox');
-    const lfValue = document.getElementById('lfValue');
-    const lfStatus = document.getElementById('lfStatus');
-
-    if (result.error) {
-      errorBox.style.display = 'block';
-      errorBox.textContent = result.error;
-      lfValue.textContent = '\u2014';
-      lfStatus.textContent = '';
-      lfStatus.className = 'lf-status';
-      document.getElementById('p3n').textContent = '\u2014';
-      document.getElementById('p3m').textContent = '\u2014';
-    } else {
-      errorBox.style.display = 'none';
-      lfValue.textContent = result.LF.toFixed(2);
-      document.getElementById('p3n').textContent = result.n3.toFixed(3);
-      document.getElementById('p3m').textContent = result.m3.toFixed(3);
-      if (result.LF >= 1) {
-        lfStatus.textContent = 'Pass';
-        lfStatus.className = 'lf-status status-pass';
-      } else {
-        lfStatus.textContent = 'Fail';
-        lfStatus.className = 'lf-status status-fail';
-      }
-    }
-  }
-
-  function syncInputs(){
-    document.getElementById('n1In').value = state.n1;
-    document.getElementById('m1In').value = state.m1;
-    document.getElementById('n2In').value = state.n2;
-    document.getElementById('m2In').value = state.m2;
-  }
-
-  // ---------- UI wiring ----------
-  document.getElementById('stageSel').addEventListener('change', (e) => {
-    state.lim = e.target.value;
-    document.getElementById('alphaBetaRow').style.display = (state.lim === 'c') ? 'grid' : 'none';
-    const { nMax, m: mFunc } = envelopeFn(state.lim, state.alpha, state.beta);
-    drawEnvelope(nMax, mFunc);
-    render();
-  });
-
-  document.getElementById('alphaIn').addEventListener('input', (e) => {
-    state.alpha = parseFloat(e.target.value) || 0.8;
-    updateConcreteEnvelope();
-  });
-  document.getElementById('betaIn').addEventListener('input', (e) => {
-    state.beta = parseFloat(e.target.value) || 0.4;
-    updateConcreteEnvelope();
-  });
-  function updateConcreteEnvelope(){
-    if (state.lim !== 'c') return;
-    const { nMax, m: mFunc } = envelopeFn(state.lim, state.alpha, state.beta);
-    drawEnvelope(nMax, mFunc);
-    render();
-  }
-
-  ['n1In','m1In','n2In','m2In'].forEach(id => {
-    document.getElementById(id).addEventListener('input', (e) => {
-      const key = id.slice(0,2);
-      const val = parseFloat(e.target.value);
-      if (!isNaN(val)) { state[key] = val; render(); }
-    });
-  });
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    Object.assign(state, DEFAULTS);
-    syncInputs();
-    render();
-  });
-
-  // ---------- init ----------
-  buildStaticLayers();
-  const initEnv = envelopeFn(state.lim, state.alpha, state.beta);
-  drawEnvelope(initEnv.nMax, initEnv.m);
-  syncInputs();
-  render();
-})();
-</script>
+<div id="foot">Last modified 2026-11-05<div style="max-width:560px; margin:4px auto 0; font-style:italic">For research, education and preliminary assessment. Provided "as is", without warranty. Results must be verified independently by the user, and the author accepts no liability for their use.</div></div>
+<script src="mn_envelope.js?v=2026-11-05a"></script>
+<script src="app.js?v=2026-11-05a"></script>
 <script data-goatcounter="https://addekth.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
