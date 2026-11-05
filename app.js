@@ -1,7 +1,8 @@
 /* app.js ----------------------------------------------------------------------
    GUI of the M-N interaction capacity page: input, tick box, plot and section drawing.
    Port of Main_gui.m; the same drawing coordinates, so the two look alike.
-   Pointer events: a mouse and a finger drag p1 and p2 the same way.
+   Pointer events: a mouse and a finger drag p1 and p2 the same way.  Print: a one page report
+   in a hidden frame, printed with the browser (Save as PDF), as in BeamStat_road.
 
    Andreas Andersson, 2026-11-05 (assisted by Claude)
 ---------------------------------------------------------------------------*/
@@ -96,18 +97,12 @@ function setText(t, s, size) {
     if (lvl) { const ts = el('tspan', { dy: (lvl * size * 0.3).toFixed(2) }, t); ts.textContent = '​'; }
 }
 
-// ----------------------------------------------------------------- the reset symbol
-function drawReset() {
-    const svg = el('svg', { viewBox: '0 0 24 24' }, $('rst'));
-    el('circle', { cx: 12, cy: 12, r: 11.5, fill: '#cc2626' }, svg);
-    const r1 = 4.6, r2 = 6.9, n = 81, a = [], b = [];
-    for (let i = 0; i < n; i++) {
-        const t = -Math.PI / 6 + (3 * Math.PI / 2 + Math.PI / 6) * i / (n - 1);
-        a.push((12 + r2 * Math.cos(t)).toFixed(3) + ',' + (12 + r2 * Math.sin(t)).toFixed(3));
-        b.unshift((12 + r1 * Math.cos(t)).toFixed(3) + ',' + (12 + r1 * Math.sin(t)).toFixed(3));
-    }
-    el('polygon', { points: a.concat(b).join(' '), fill: '#fff' }, svg);
-    el('polygon', { points: '12,2.7 12,9.9 16.6,6.3', fill: '#fff' }, svg);
+// ------------------------------------------------------- the symbols, as BeamStat_road
+function drawSymbols() {
+    $('sRst').innerHTML = '<svg viewBox="0 0 24 24"><path d="M18.06 8.5 A7 7 0 1 1 12 5" fill="none" stroke="#cc2626" stroke-width="3"/><polygon points="12,0.8 12,9.2 17.5,5" fill="#cc2626"/></svg>';
+    $('sRep').innerHTML = '<svg viewBox="0 0 24 24"><rect x="7.5" y="3" width="9" height="6.5" fill="#fff" stroke="#737373"/><rect x="2" y="8" width="20" height="10" rx="2" fill="#666b73"/>' +
+        '<rect x="6" y="14" width="12" height="1.5" fill="#333338"/><rect x="7.5" y="15" width="9" height="6" fill="#fff" stroke="#737373"/>' +
+        '<path d="M9 17.5H15M9 19.5H15" stroke="#737373"/><circle cx="18.5" cy="11" r="1" fill="#4dbf59"/></svg>';
 }
 
 // ------------------------------------------------------------------ the result plot
@@ -160,7 +155,8 @@ function buildPlot() {
     P.tP = [text(svg, '$p_1$', 0, 0, { anchor: 'middle' }), text(svg, '$p_2$', 0, 0, { anchor: 'middle' })];
     P.t3 = [text(svg, '$p_{3,\\mathrm{II}}$', 0, 0), text(svg, '$p_{3,\\mathrm{III}}$', 0, 0)];
     P.tV = [text(svg, '', 474, AX.y + 20), text(svg, '', 474, AX.y + 46)];
-    P.legend = el('g', {}, svg);
+    P.tV.forEach(t => t.setAttribute('class', 'tv'));
+    P.legend = el('g', { class: 'lgd' }, svg);
     // the grips: larger than the markers, so that a finger finds them; p2 on top, as in MATLAB
     const r = window.matchMedia && matchMedia('(pointer: coarse)').matches ? 24 : 10;
     P.hit = [0, 1].map(k => {
@@ -504,8 +500,140 @@ function onMove(ev) {
 }
 function onUp() { drag = 0; }
 
+// ------------------------------------------------------------------------- report
+const SPAN = (a, b) => `<i>${a}</i><sub>${b}</sub>`;
+const FCD = SPAN('f', 'cd');
+const FRAC = (a, b) => `<span class="frac"><span>${a}</span><span>${b}</span></span>`;
+const num3 = v => (isNaN(v) ? '–' : v.toFixed(3).replace('-', '−'));
+
+// the plot, from the page, with the legend on one line under it, in the proportions of the GUI
+function reportPlot() {
+    const c = $('res').cloneNode(true);
+    c.querySelectorAll('.hit, .tv, .lgd').forEach(o => o.remove());
+    c.removeAttribute('class'); c.removeAttribute('style');
+    c.setAttribute('viewBox', '0 22 470 376');
+    c.setAttribute('width', '120mm'); c.setAttribute('height', (120 * 376 / 470) + 'mm');
+    const g = el('g', {}, c);
+    const rows = [['Stage II', null, 'none', 1], ['Stage III', null, '8 4', 1], ['Core limit', null, '1.5 3', 0.8]];
+    if (inp.rot) rows.push(['Rot. limit', C_PINK, 'none', 1]);
+    let x = 58;
+    const y = 388;
+    for (const r of rows) {
+        if (r[1]) el('rect', { x, y: y - 6, width: 22, height: 12, fill: r[1], stroke: 'none' }, g);
+        else el('line', { x1: x, y1: y, x2: x + 22, y2: y, stroke: '#000', 'stroke-width': r[3] * LW, 'stroke-dasharray': r[2] }, g);
+        text(g, r[0], x + 26, y, { size: 13.3 });
+        x += 26 + 62;
+    }
+    return c.outerHTML;
+}
+
+function reportModel() {
+    const c = $('model').cloneNode(true);
+    c.removeAttribute('class'); c.removeAttribute('style');
+    c.setAttribute('viewBox', '-4 0 548 142');
+    c.setAttribute('width', '160mm'); c.setAttribute('height', (160 * 142 / 548) + 'mm');
+    return c.outerHTML;
+}
+
+function reportHTML() {
+    const res = window.res;
+    const row = (a, p, last) => `<tr><td>${a}</td><td class="r">${num3(p[0])}</td><td class="r">${num3(p[1])}</td><td${last.r ? ' class="r"' : ''}>${last.t}</td></tr>`;
+    const psi = v => (isNaN(v) ? '–' : v.toFixed(2));
+    const P1 = '<i>p</i><sub>1</sub>', P2 = '<i>p</i><sub>2</sub>', P3 = '<i>p</i><sub>3</sub>';
+    const ep = SPAN('ε', 'cu');
+    return `<h1>M-N interaction capacity</h1>
+<h2>Basis</h2>
+<ul>
+<li>Unreinforced rectangular cross-section <i>b</i>&#8201;×&#8201;<i>t</i>, no tensile strength, plane sections; <i>n</i> and <i>m</i> normalised by ${FCD}.</li>
+<li>Stage II: linear stresses, ${FCD} at the compressed edge. Stage III: uniform ${FCD} over <i>y</i> = 0.8&#8201;${SPAN('x', 'c')} from that edge.</li>
+<li>Load line from ${P1} through ${P2}; ${P3}, where it leaves the envelope, gives the load factor <i>ψ</i>. Stresses at ${P3}.</li>
+${inp.rot ? `<li>Rotation limit: edge strain ${ep} = 3.5&nbsp;‰, parabola-rectangle, EN&nbsp;1992-1-1:2023 (8.4), ${SPAN('ε', 'c2')} = 2&nbsp;‰; limits <i>ψ</i><sub>III</sub>.</li>` : ''}
+</ul>
+<h2>Input</h2>
+<table><thead><tr><th>Point</th><th class="r"><i>n</i></th><th class="r"><i>m</i></th><th>Load</th></tr></thead><tbody>
+${row(P1, inp.p1, { t: SPAN('Q', 'perm') })}
+${row(P2, inp.p2, { t: SPAN('Q', 'perm') + ' + ' + SPAN('Q', 'live') })}
+</tbody></table>
+<h2>Model</h2>
+<figure>${reportModel()}<figcaption>Figure 1: &nbsp; Section and stresses at ${P3}.</figcaption></figure>
+<div class="eqs">
+<div><i>n</i> = ${FRAC('<i>N</i>', '<i>b</i>&#8201;<i>t</i>&#8201;' + FCD)}, &nbsp; <i>m</i> = ${FRAC('<i>M</i>', '<i>b</i>&#8201;<i>t</i><sup>2</sup>&#8201;' + FCD)}</div>
+<div><i>ψ</i> = ${FRAC('<i>n</i><sub>3</sub> − <i>n</i><sub>1</sub>', '<i>n</i><sub>2</sub> − <i>n</i><sub>1</sub>')}</div>
+<div>|<i>m</i>|<sub>II</sub> ≤ <span class="brace">{</span><span class="rows"><span><i>n</i>/2 − 2<i>n</i><sup>2</sup>/3,</span><span>0 ≤ <i>n</i> ≤ 0.5</span><span>(1 − <i>n</i>)/6,</span><span>0.5 ≤ <i>n</i> ≤ 1</span></span></div>
+<div>|<i>m</i>|<sub>III</sub> ≤ <i>n</i>/2 − (<i>β</i>/<i>α</i>)&#8201;<i>n</i><sup>2</sup>, &nbsp; 0 ≤ <i>n</i> ≤ 1, &nbsp; <i>α</i> = 0.8, <i>β</i> = 0.4</div>
+${inp.rot ? `<div>${SPAN('θ', 'cap')} = <span class="par">(</span>${FRAC(ep, SPAN('x', 'cu'))} − ${FRAC(FCD, SPAN('E', 'c') + '&#8201;' + SPAN('x', 'c'))}<span class="par">)</span>&#8201;${SPAN('l', 'p')}</div>
+<div>${SPAN('x', 'cu')}, ${SPAN('x', 'c')}: depth to the neutral axis at ${ep} and at stage II</div>` : ''}
+</div>
+<h2>Results</h2>
+<div class="side">
+<figure>${reportPlot()}<figcaption>Figure 2: &nbsp; Envelopes and load line.</figcaption></figure>
+<div>
+<table><thead><tr><th>Point</th><th class="r"><i>n</i></th><th class="r"><i>m</i></th><th class="r"><i>ψ</i></th></tr></thead><tbody>
+${row('<i>p</i><sub>3,II</sub>', res.p3II, { t: psi(res.psiII), r: 1 })}
+${row('<i>p</i><sub>3,III</sub>', res.p3III, { t: psi(res.psiIII), r: 1 })}
+</tbody></table>
+${res.rotIII ? '<div class="note"><i>p</i><sub>3,III</sub> lies on the rotation limit.</div>' : ''}
+</div>
+</div>`;
+}
+
+function printHTML(title, body) {
+    const today = new Date().toISOString().slice(0, 10);
+    const css = `@page { size: A4; margin: 15mm 20mm 8mm 20mm;
+        @top-right { content: "${today}"; font: 11pt "Times New Roman", Times, serif; } }
+      body { margin: 0; font: 11pt/1.15 "Times New Roman", Times, serif; color: #000; }
+      h1 { font-size: 16pt; font-weight: normal; margin: 0 0 3pt; }
+      h2 { font-size: 12pt; margin: 7pt 0 2pt; break-after: avoid; }
+      ul { margin: 0 0 3pt; padding-left: 1.2em; }
+      li { margin: 0 0 1pt; }
+      sub, sup { font-size: 72%; line-height: 0; }
+      table { border-collapse: collapse; margin: 2pt auto 3pt; }
+      th, td { padding: 1pt 7pt; text-align: left; font-weight: normal; }
+      td.r, th.r { text-align: right; }
+      thead tr { border-top: 0.8pt solid #000; border-bottom: 0.8pt solid #000; }
+      tbody tr:last-child { border-bottom: 0.8pt solid #000; }
+      figure { margin: 2pt 0; text-align: center; }
+      figcaption { font-size: 10pt; margin-top: 2pt; }
+      svg { display: block; margin: 0 auto; }
+      svg text { pointer-events: none; }
+      .eqs { display: grid; grid-template-columns: 1fr 1.25fr; align-items: center; gap: 4pt 10pt; margin: 3pt 6mm; }
+      .eqs > div { white-space: nowrap; }
+      .frac { display: inline-flex; flex-direction: column; text-align: center; line-height: 1.12; margin: 0 1pt; vertical-align: middle; }
+      .frac > span:first-child { border-bottom: 0.6pt solid #000; padding: 0 2pt 1pt; }
+      .frac > span:last-child { padding: 1pt 2pt 0; }
+      .par { font-size: 28pt; font-weight: 200; line-height: 1; transform: scaleX(0.65); display: inline-block; margin: 0 -2pt; vertical-align: middle; }
+      .brace { font-size: 30pt; font-weight: 200; line-height: 1; transform: scaleX(0.6); display: inline-block; margin: 0 -1pt; vertical-align: middle; }
+      .rows { display: inline-grid; grid-template-columns: auto auto; column-gap: 9pt; row-gap: 1pt; vertical-align: middle; }
+      .side { display: flex; align-items: center; justify-content: space-between; }
+      .side figure { flex: none; width: 120mm; }
+      .side > div { flex: none; width: 48mm; }
+      .note { font-size: 10pt; text-align: center; }`;
+    const fr = document.createElement('iframe');
+    fr.style.cssText = 'position:fixed; right:0; bottom:0; width:0; height:0; border:0';
+    document.body.appendChild(fr);
+    const doc = fr.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${css}</style></head><body>${body}</body></html>`);
+    doc.close();
+    if (window.__printHook) { window.__printHook(fr, title); return; }
+    const t0 = document.title;
+    document.title = title;
+    setTimeout(() => {
+        fr.contentWindow.focus(); fr.contentWindow.print();
+        document.title = t0;
+        setTimeout(() => fr.remove(), 1000);
+    }, 300);
+}
+
+function onReport() {
+    if (['n1', 'm1', 'n2', 'm2'].some(id => isNaN(readNum($(id).value)))) { setMsg('input error'); return; }
+    onInput();
+    printHTML('MN_envelope', reportHTML());
+    setMsg('print dialog: Save as PDF', true);
+}
+
 // -------------------------------------------------------------------------- start
-drawReset();
+drawSymbols();
 buildPlot();
 $('n1').value = DEF.n1; $('m1').value = DEF.m1;
 $('n2').value = DEF.n2; $('m2').value = DEF.m2;
@@ -514,6 +642,7 @@ for (const id of ['n1', 'm1', 'n2', 'm2']) {
     $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); onInput(); ev.target.blur(); } });
 }
 $('iRot').addEventListener('change', onInput);
-$('rst').addEventListener('click', onReset);
+$('sRst').addEventListener('click', onReset);
+$('sRep').addEventListener('click', onReport);
 onInput();
 })();

@@ -4,9 +4,11 @@ Web version of `Main_gui.m` and `MN_envelope.m` in MN_envelope: M-N capacity of 
 
 | File | Content |
 |---|---|
-| `index.html` | layout, as the MATLAB figure, 560 x 800 px; viewport 600 px, so that a phone shows the whole width |
-| `app.js` | GUI: input, tick box, plot, section drawing, drag of p1 and p2 by mouse or finger |
+| `index.html` | layout, as the MATLAB figure, 560 x 848 px; viewport 600 px, so that a phone shows the whole width |
+| `app.js` | GUI: symbol bar, input, tick box, plot, section drawing, drag of p1 and p2 by mouse or finger, one page report |
 | `mn_envelope.js` | solver, port of MN_envelope.m |
+
+Print opens the browser's print preview: choose Save as PDF.
 
 When a file changes, raise `?v=` and "Last modified" in `index.html`.
 
