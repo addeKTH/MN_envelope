@@ -15,7 +15,7 @@ const FONT = '"Times New Roman", Times, serif';
 const DEF = { n1: '0.30', m1: '0.01', n2: '0.50', m2: '0.04', rot: false };
 const ALPHA = 0.8, BETA = 0.4;
 const LIMS = [0, 1, -0.2, 0.2];
-const C_BAD = '#b30000', C_GREY = '#737373', C_PINK = '#ffccdb', C_LIM = '#bf3366';
+const C_BAD = '#b30000', C_PINK = '#ffccdb', C_LIM = '#bf3366';
 const C_P1 = '#0072bd', C_P2 = '#006b21', C_P3II = '#e06b00', C_P3III = '#d90000';
 const LW = 4 / 3;                     // MATLAB points to pixels
 
@@ -155,14 +155,11 @@ function buildPlot() {
     P.tP = [text(svg, '$p_1$', 0, 0, { anchor: 'middle' }), text(svg, '$p_2$', 0, 0, { anchor: 'middle' })];
     P.t3 = [text(svg, '$p_{3,\\mathrm{II}}$', 0, 0), text(svg, '$p_{3,\\mathrm{III}}$', 0, 0)];
     // a label to the left of x = 510, the value with its = sign from 514, so that the = signs
-    // stand in one column; load factors bold, p3 below them, grey
+    // stand in one column; bold
     P.tVl = [['II', 20], ['III', 46]].map(r => text(svg, `$\\psi_\\mathrm{${r[0]}}$`, 510, AX.y + r[1], { anchor: 'end' }));
     P.tV = [20, 46].map(y => text(svg, '', 514, AX.y + y));
     P.tVl.concat(P.tV).forEach(t => t.setAttribute('font-weight', 'bold'));
-    const pLab = ['$n_{3,\\mathrm{II}}$', '$m_{3,\\mathrm{II}}$', '$n_{3,\\mathrm{III}}$', '$m_{3,\\mathrm{III}}$'], yQ = [88, 108, 128, 148];
-    P.tQl = pLab.map((s, k) => text(svg, s, 510, AX.y + yQ[k], { size: 13.3, anchor: 'end', fill: C_GREY }));
-    P.tQ = yQ.map(y => text(svg, '', 514, AX.y + y, { size: 13.3, fill: C_GREY }));
-    P.tVl.concat(P.tV, P.tQl, P.tQ).forEach(t => t.setAttribute('class', 'tv'));
+    P.tVl.concat(P.tV).forEach(t => t.setAttribute('class', 'tv'));
     P.legend = el('g', { class: 'lgd' }, svg);
     // the grips: larger than the markers, so that a finger finds them; p2 on top, as in MATLAB
     const r = window.matchMedia && matchMedia('(pointer: coarse)').matches ? 24 : 10;
@@ -247,7 +244,7 @@ function labelAt(k) {
     return xy;
 }
 
-// a value with its = sign, outside math: a small dash for a negative value
+// a load factor with its = sign
 const valText = v => '= ' + (isNaN(v) ? '--' : v.toFixed(2));
 
 function update() {
@@ -283,7 +280,6 @@ function update() {
         const c = v < 1 ? C_BAD : '#000';                        // red: p2 outside the capacity
         P.tV[k].setAttribute('fill', c); P.tVl[k].setAttribute('fill', c);
     });
-    [res.p3II[0], res.p3II[1], res.p3III[0], res.p3III[1]].forEach((v, k) => setText(P.tQ[k], valText(v), 13.3));
     drawSection(res.II, res.III, res.p3II, res.p3III);
 }
 
@@ -473,6 +469,8 @@ function clampP1(p) {
 function syncBoxes() {
     $('n1').value = fmt(inp.p1[0]); $('m1').value = fmt(inp.p1[1]);
     $('n2').value = fmt(inp.p2[0]); $('m2').value = fmt(inp.p2[1]);
+    for (const id of ['n1', 'm1', 'n2', 'm2']) $(id).classList.remove('bad');
+    $('sRep').disabled = false;
     setMsg('');
 }
 
@@ -482,10 +480,19 @@ function onInput() {
         const s = $(id).value;
         if (s.includes(',') && !isNaN(readNum(s))) $(id).value = s.replace(/,/g, '.');
     }
-    const v = ['n1', 'm1', 'n2', 'm2'].map(id => readNum($(id).value));
+    const v = ['n1', 'm1', 'n2', 'm2'].map(id => {
+        const x = readNum($(id).value);
+        $(id).classList.toggle('bad', isNaN(x));                 // a box with an error: light red
+        return x;
+    });
     inp.rot = $('iRot').checked;
     $('rotBox').classList.toggle('on', inp.rot);
-    if (v.some(isNaN)) { setMsg('input error'); return; }
+    $('sRep').disabled = v.some(isNaN);                          // no report from an input error
+    if (v.some(isNaN)) {                                         // no load factors; the plots stay as they are
+        setMsg('input error');
+        P.tV.forEach((t, k) => { setText(t, '= —', 14.7); t.setAttribute('fill', '#000'); P.tVl[k].setAttribute('fill', '#000'); });
+        return;
+    }
     setMsg('');
     inp.p1 = [v[0], v[1]]; inp.p2 = [v[2], v[3]];
     const c = clampP1(inp.p1);
@@ -677,8 +684,8 @@ function printHTML(title, body) {
 }
 
 function onReport() {
-    if (['n1', 'm1', 'n2', 'm2'].some(id => isNaN(readNum($(id).value)))) { setMsg('input error'); return; }
     onInput();
+    if (['n1', 'm1', 'n2', 'm2'].some(id => isNaN(readNum($(id).value)))) return;
     printHTML('MN_envelope', reportHTML());
     setMsg('print dialog: Save as PDF', true);
 }
