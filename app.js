@@ -437,13 +437,30 @@ function drawSection(II, III, pII, pIII) {
 
 // ------------------------------------------------------------------------ callbacks
 // one finite number from a box, simple expressions allowed, as MATLAB's str2num; NaN if not
+// a number and simple expressions, by a small parser, as the other apps: nothing is evaluated as code
+function evalExpr(s) {
+    let i = 0;
+    const peek = () => s[i], ws = () => { while (s[i] === ' ') i++; };
+    function num() {
+        ws();
+        const m = /^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/.exec(s.slice(i));
+        if (m) { i += m[0].length; return parseFloat(m[0]); }
+        if (peek() === '(') { i++; const v = add(); ws(); if (s[i++] !== ')') throw 0; return v; }
+        if (peek() === '-') { i++; return -pow(); }
+        if (peek() === '+') { i++; return pow(); }
+        throw 0;
+    }
+    function pow() { let v = num(); ws(); while (peek() === '^') { i++; v = Math.pow(v, num()); ws(); } return v; }
+    function mul() { let v = pow(); ws(); while (peek() === '*' || peek() === '/') { const o = s[i++]; const w = pow(); v = o === '*' ? v * w : v / w; ws(); } return v; }
+    function add() { let v = mul(); ws(); while (peek() === '+' || peek() === '-') { const o = s[i++]; const w = mul(); v = o === '+' ? v + w : v - w; ws(); } return v; }
+    const v = add(); ws();
+    if (i !== s.length || !isFinite(v)) throw 0;
+    return v;
+}
 function readNum(s) {
     s = String(s).trim().replace(/,/g, '.');                     // a decimal comma
-    if (!s || !/^[-+*/().\deE\s]+$/.test(s)) return NaN;
-    try {
-        const v = Function('"use strict"; return (' + s + ');')();
-        return typeof v === 'number' && isFinite(v) ? v : NaN;
-    } catch (e) { return NaN; }
+    if (!s || s.length > 200) return NaN;
+    try { return evalExpr(s); } catch (e) { return NaN; }
 }
 const fmt = v => String(Number(v.toPrecision(4)));
 
@@ -696,6 +713,7 @@ buildPlot();
 $('n1').value = DEF.n1; $('m1').value = DEF.m1;
 $('n2').value = DEF.n2; $('m2').value = DEF.m2;
 for (const id of ['n1', 'm1', 'n2', 'm2']) {
+    $(id).maxLength = 200;
     $(id).addEventListener('change', onInput);
     $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); onInput(); ev.target.blur(); } });
 }
