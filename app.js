@@ -15,7 +15,7 @@ const FONT = '"Times New Roman", Times, serif';
 const DEF = { n1: '0.30', m1: '0.01', n2: '0.50', m2: '0.04', rot: false };
 const ALPHA = 0.8, BETA = 0.4;
 const LIMS = [0, 1, -0.2, 0.2];
-const C_BAD = '#b30000', C_PINK = '#ffccdb', C_LIM = '#bf3366';
+const C_BAD = '#b30000', C_GREY = '#737373', C_PINK = '#ffccdb', C_LIM = '#bf3366';
 const C_P1 = '#0072bd', C_P2 = '#006b21', C_P3II = '#e06b00', C_P3III = '#d90000';
 const LW = 4 / 3;                     // MATLAB points to pixels
 
@@ -154,8 +154,15 @@ function buildPlot() {
     // labels, then the load factors to the right
     P.tP = [text(svg, '$p_1$', 0, 0, { anchor: 'middle' }), text(svg, '$p_2$', 0, 0, { anchor: 'middle' })];
     P.t3 = [text(svg, '$p_{3,\\mathrm{II}}$', 0, 0), text(svg, '$p_{3,\\mathrm{III}}$', 0, 0)];
-    P.tV = [text(svg, '', 474, AX.y + 20), text(svg, '', 474, AX.y + 46)];
-    P.tV.forEach(t => t.setAttribute('class', 'tv'));
+    // a label to the left of x = 510, the value with its = sign from 514, so that the = signs
+    // stand in one column; load factors bold, p3 below them, grey
+    P.tVl = [['II', 20], ['III', 46]].map(r => text(svg, `$\\psi_\\mathrm{${r[0]}}$`, 510, AX.y + r[1], { anchor: 'end' }));
+    P.tV = [20, 46].map(y => text(svg, '', 514, AX.y + y));
+    P.tVl.concat(P.tV).forEach(t => t.setAttribute('font-weight', 'bold'));
+    const pLab = ['$n_{3,\\mathrm{II}}$', '$m_{3,\\mathrm{II}}$', '$n_{3,\\mathrm{III}}$', '$m_{3,\\mathrm{III}}$'], yQ = [88, 108, 128, 148];
+    P.tQl = pLab.map((s, k) => text(svg, s, 510, AX.y + yQ[k], { size: 13.3, anchor: 'end', fill: C_GREY }));
+    P.tQ = yQ.map(y => text(svg, '', 514, AX.y + y, { size: 13.3, fill: C_GREY }));
+    P.tVl.concat(P.tV, P.tQl, P.tQ).forEach(t => t.setAttribute('class', 'tv'));
     P.legend = el('g', { class: 'lgd' }, svg);
     // the grips: larger than the markers, so that a finger finds them; p2 on top, as in MATLAB
     const r = window.matchMedia && matchMedia('(pointer: coarse)').matches ? 24 : 10;
@@ -240,7 +247,8 @@ function labelAt(k) {
     return xy;
 }
 
-const psiText = (st, v) => `$\\psi_\\mathrm{${st}}$ = ` + (isNaN(v) ? '--' : v.toFixed(2));
+// a value with its = sign, outside math: a small dash for a negative value
+const valText = v => '= ' + (isNaN(v) ? '--' : v.toFixed(2));
 
 function update() {
     const res = MN.run(inp.p1, inp.p2, ALPHA, BETA, inp.rot);
@@ -270,8 +278,12 @@ function update() {
             P.t3[k].style.display = '';
         }
     }
-    setText(P.tV[0], psiText('II', res.psiII), 14.7);
-    setText(P.tV[1], psiText('III', res.psiIII), 14.7);
+    [res.psiII, res.psiIII].forEach((v, k) => {
+        setText(P.tV[k], valText(v), 14.7);
+        const c = v < 1 ? C_BAD : '#000';                        // red: p2 outside the capacity
+        P.tV[k].setAttribute('fill', c); P.tVl[k].setAttribute('fill', c);
+    });
+    [res.p3II[0], res.p3II[1], res.p3III[0], res.p3III[1]].forEach((v, k) => setText(P.tQ[k], valText(v), 13.3));
     drawSection(res.II, res.III, res.p3II, res.p3III);
 }
 
@@ -430,7 +442,7 @@ function drawSection(II, III, pII, pIII) {
 // ------------------------------------------------------------------------ callbacks
 // one finite number from a box, simple expressions allowed, as MATLAB's str2num; NaN if not
 function readNum(s) {
-    s = String(s).trim();
+    s = String(s).trim().replace(/,/g, '.');                     // a decimal comma
     if (!s || !/^[-+*/().\deE\s]+$/.test(s)) return NaN;
     try {
         const v = Function('"use strict"; return (' + s + ');')();
@@ -466,6 +478,10 @@ function syncBoxes() {
 
 let envRot = null;
 function onInput() {
+    for (const id of ['n1', 'm1', 'n2', 'm2']) {                 // a decimal comma: a point, also in the box
+        const s = $(id).value;
+        if (s.includes(',') && !isNaN(readNum(s))) $(id).value = s.replace(/,/g, '.');
+    }
     const v = ['n1', 'm1', 'n2', 'm2'].map(id => readNum($(id).value));
     inp.rot = $('iRot').checked;
     $('rotBox').classList.toggle('on', inp.rot);
@@ -474,10 +490,18 @@ function onInput() {
     inp.p1 = [v[0], v[1]]; inp.p2 = [v[2], v[3]];
     const c = clampP1(inp.p1);
     inp.p1 = c.p;
+    const note = [];
     if (c.moved) {
         $('n1').value = fmt(inp.p1[0]); $('m1').value = fmt(inp.p1[1]);
-        setMsg(c.atLim ? 'p1 moved onto the rotation limit' : 'p1 moved onto the stage III envelope', true);
+        note.push(c.atLim ? 'p1 moved onto the rotation limit' : 'p1 moved onto the stage III envelope');
     }
+    const p2 = [Math.min(Math.max(inp.p2[0], LIMS[0]), LIMS[1]), Math.min(Math.max(inp.p2[1], LIMS[2]), LIMS[3])];   // p2 within the plot
+    if (p2[0] !== inp.p2[0] || p2[1] !== inp.p2[1]) {
+        inp.p2 = p2;
+        $('n2').value = fmt(p2[0]); $('m2').value = fmt(p2[1]);
+        note.push('p2 moved to the limit of the plot');
+    }
+    if (note.length) setMsg(note.join(', '), true);
     if (envRot !== inp.rot) { drawEnvelopes(); envRot = inp.rot; }
     update();
 }
@@ -647,6 +671,7 @@ function printHTML(title, body) {
     setTimeout(() => {
         fr.contentWindow.focus(); fr.contentWindow.print();
         document.title = t0;
+        if ($('msg').textContent.startsWith('print dialog')) setMsg('');
         setTimeout(() => fr.remove(), 1000);
     }, 300);
 }
